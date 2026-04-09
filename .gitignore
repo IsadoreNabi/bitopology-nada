@@ -1,0 +1,52 @@
+# Lean
+/.lake
+/build
+/lake-packages
+
+# LaTeX intermediate files
+*.aux
+*.log
+*.out
+*.toc
+*.bbl
+*.blg
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+
+# R / knitr
+*.Rproj.user/
+.Rhistory
+.RData
+.Ruserdata
+paper/reproducibility_cache/
+paper/reproducibility_files/
+paper/reproducibility.knit.md
+
+# Python helper scripts (local use only)
+paper/apply_*.py
+paper/__pycache__/
+
+# Backups de los parches
+paper/*.bak
+paper/*.bak.*
+
+# Herramientas locales
+.gauss/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backups con sufijo arbitrario (pattern más permisivo)
+paper/*.bak*
+paper/*.tex.bak*
+
+# Rendered outputs del Rmd que no van al repo
+paper/reproducibility.docx
+paper/reproducibility.pdf

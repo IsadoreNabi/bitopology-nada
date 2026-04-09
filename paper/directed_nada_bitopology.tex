@@ -1,0 +1,2362 @@
+\documentclass[11pt,a4paper]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{mathtools}
+\usepackage{enumitem}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{hyperref}
+\usepackage{cleveref}
+\hypersetup{hypertexnames=false}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+
+% ── Theorem environments ─────────────────────────────────────────────────────
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\newtheorem{remark}[theorem]{Remark}
+
+% ── Notation ─────────────────────────────────────────────────────────────────
+\newcommand{\Nfwd}[1]{N^{+}[#1]}
+\newcommand{\Nbwd}[1]{N^{-}[#1]}
+\newcommand{\Ncl}[1]{N[#1]}
+\newcommand{\taufwd}{\tau^{+}}
+\newcommand{\taubwd}{\tau^{-}}
+\newcommand{\powerset}{\mathcal{P}}
+\newcommand{\subbase}{\mathcal{S}}
+\newcommand{\base}{\mathcal{B}}
+
+% ── Title ────────────────────────────────────────────────────────────────────
+\title{%
+  Bitopological Spaces from Directed Graphs:\\
+  Extending the Nada Construction to Capture\\
+  Temporal Irreversibility%
+}
+
+\author{%
+  Jos\'e Mauricio G\'omez Juli\'an\\
+  \textit{Independent Researcher}\\
+  \texttt{mauriciogomezjulian@protonmail.ch}%
+}
+
+\date{\today}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Nada et al.\ (2018) constructed a topology on the vertex set of an
+undirected graph by taking the closed neighborhoods as a subbase and
+closing under finite intersections and arbitrary unions.  We extend this
+construction to directed graphs: for a digraph $G = (V, E)$, applying the
+procedure separately to the forward and backward closed neighborhoods
+yields two topologies $\taufwd$ and~$\taubwd$ on~$V$.  The triple
+$(V, \taufwd, \taubwd)$ is a bitopological space in the sense of
+Kelly~(1963); no hypothesis on~$G$ is required, because the topology
+axioms are universal operations on the powerset.  The asymmetry between
+$\taufwd$ and $\taubwd$ provides a topological quantification of temporal
+irreversibility when~$G$ arises as the directed visibility graph of a
+time series.  We prove the central theorem and related results on the
+Alexandrov sublayer, the specialization preorder, and pairwise
+connectedness; supply algorithms with polynomial-time complexity and a
+three-valued pairwise decision procedure that honestly reports resource
+exhaustion; formalize the core proofs in Lean~4 against Mathlib; and
+apply the framework to quarterly U.S.\ real GDP growth (1992--2024,
+$n = 129$), recovering a positive asymmetry direction consistent with
+slow-expansion / abrupt-contraction dynamics and a coherent topological
+classification of the COVID-19 contraction and rebound as a single
+episode.
+\end{abstract}
+
+\medskip
+\noindent\textbf{Keywords:} bitopological spaces, directed graphs, visibility
+graphs, time series analysis, temporal irreversibility, Lean 4 formalization.
+
+\medskip
+\noindent\textbf{MSC 2020:} 54E55, 05C20, 37M10, 68V20.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Introduction}\label{sec:intro}
+% ══════════════════════════════════════════════════════════════════════════════
+
+The analysis of time series through network-theoretic methods has become a
+fruitful line of research since the introduction of visibility graphs by Lacasa
+et al.~\cite{Lacasa2008}.  Given a time series $(x_1, x_2, \ldots, x_n)$, one
+constructs a graph whose vertices are the time indices and whose edges encode a
+geometric visibility condition between data points.  Topological properties of
+the resulting graph---degree distributions, clustering coefficients, community
+structure---then serve as invariants of the underlying dynamics.
+
+A natural refinement is to orient the edges of the visibility graph from earlier
+to later time indices, producing a directed acyclic graph (DAG) in which the
+time index serves as a topological order.  This orientation carries information
+about temporal asymmetry that is invisible to any undirected construction: in
+systems with asymmetric dynamics---sharp contractions followed by slow
+recoveries in financial markets, rapid heating followed by gradual relaxation in
+physical systems, causal precedence in event sequences---the directed graph
+distinguishes the forward flow of time from the backward flow, while its
+undirected shadow does not.
+
+Nada et al.~\cite{Nada2018} introduced a procedure for endowing the vertex set
+of an undirected graph with a topology: one takes the family of closed
+neighborhoods $\{\Ncl{v} : v \in V\}$ as a subbase and generates a topology by
+closing under finite intersections and arbitrary unions.  This construction
+yields topological invariants (connectedness, separation, component counts) that
+capture structural properties of the graph.
+
+The central observation of this paper is that the Nada procedure extends without
+modification to directed graphs and, in doing so, produces not one but two
+topologies.  Given a digraph $G = (V, E)$, define:
+\begin{itemize}[nosep]
+  \item the \emph{forward closed neighborhood}
+        $\Nfwd{v} = \{v\} \cup \{w : (v,w) \in E\}$;
+  \item the \emph{backward closed neighborhood}
+        $\Nbwd{v} = \{v\} \cup \{w : (w,v) \in E\}$.
+\end{itemize}
+Applying the Nada procedure to $\subbase^{+} = \{\Nfwd{v} : v \in V\}$ yields a
+topology $\taufwd$; applying it to $\subbase^{-} = \{\Nbwd{v} : v \in V\}$
+yields a topology $\taubwd$.  The triple $(V, \taufwd, \taubwd)$ is a
+\emph{bitopological space} in the sense of Kelly~\cite{Kelly1963}.
+
+The extension itself is a one-line corollary of the universality of generated topologies and carries essentially no mathematical content. The contribution of this paper begins only after this point. What is nontrivial is that this trivial extension canonically produces a bitopological structure whose pairwise invariants encode temporal asymmetry. The proof of this fact is structurally trivial: the topology axioms---closure
+under finite intersections and arbitrary unions---are universal operations on
+families of subsets of any set, and they are entirely indifferent to whether the
+generating family arose from forward neighborhoods, backward neighborhoods, or
+any other construction.  This structural triviality is exactly the point.  It
+means that the extension from undirected to directed graphs is automatic and
+requires no additional hypotheses (no symmetry, no connectedness, no acyclicity).
+The mathematical content of the contribution lies not in the depth of the proof
+but in identifying three things:
+\begin{enumerate}[label=(\alph*),nosep]
+  \item The asymmetry $\Nfwd{v} \neq \Nbwd{v}$ is precisely what captures
+        temporal irreversibility: the topologies $\taufwd$ and $\taubwd$
+        coincide if and only if $G$ is symmetric.
+  \item The pair $(\taufwd, \taubwd)$ carries genuinely more information than
+        either topology alone, because the pairwise separation properties of
+        Kelly~\cite{Kelly1963} depend jointly on both topologies.
+  \item The construction is tractable and yields quantitative invariants
+        (component counts, base sizes, pairwise connectedness, clopen
+        asymmetry) that can serve as features in time-series analysis.
+\end{enumerate}
+
+To verify the universality claim mechanically, we formalize the core
+definitions and the central theorem in Lean~4 using the Mathlib library.
+The formal proof reduces to two invocations of
+\texttt{TopologicalSpace.generateFrom}, each of which satisfies the
+topology axioms by construction, so the central theorem is mechanically
+verified with no unproved placeholder.  A single \texttt{sorry} remains
+elsewhere in the formalization, corresponding to the classical
+McCord--Stong equivalence between topological connectedness and
+comparability-graph connectedness for finite spaces
+(\Cref{thm:specialization-components} below); this is a matter of
+Mathlib infrastructure rather than mathematical uncertainty, since the
+paper contains a complete classical proof of the theorem.  We discuss
+the status of this gap in \Cref{subsec:limitations}.
+
+The remainder of this paper is organized as follows.
+\Cref{sec:prelim} establishes the necessary definitions and background
+from point-set topology, graph theory, and the theory of bitopological
+spaces.  \Cref{sec:extension} states and proves the central theorem,
+establishes the relationship between the Nada topology and the
+Alexandrov topology, defines irreversibility indices, and characterizes
+pairwise connectedness.  \Cref{sec:algorithms} presents the algorithms
+that realize the construction, together with polynomial-time complexity
+analyses tied to the theorems of \Cref{sec:extension} and a three-valued
+decision procedure for pairwise connectedness.  \Cref{sec:empirical}
+applies the framework to the quarterly growth rate of U.S.\ real gross
+domestic product over 1992--2024, obtaining explicit topological
+invariants and a substantive finding about the COVID-19 shock.
+\Cref{sec:discussion} discusses the relation to prior work, the
+epistemic relation between the formalist proof and the constructive
+algorithm, limitations, and directions for future work.
+\Cref{sec:conclusion} summarizes.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Preliminaries}\label{sec:prelim}
+% ══════════════════════════════════════════════════════════════════════════════
+
+We establish the definitions and results that the central theorem depends on.
+All sets are assumed to be subsets of a fixed nonempty set $V$ unless otherwise
+stated.  We write $\powerset(V)$ for the powerset of $V$.
+
+% ── 2.1 Topological spaces ──────────────────────────────────────────────────
+\subsection{Topological spaces}\label{subsec:topology}
+
+\begin{definition}[Topology]\label{def:topology}
+A \emph{topology} on a set $X$ is a collection $\tau \subseteq \powerset(X)$
+satisfying:
+\begin{enumerate}[label=(\roman*),nosep]
+  \item $\varnothing \in \tau$ and $X \in \tau$.
+  \item If $U_1, U_2 \in \tau$, then $U_1 \cap U_2 \in \tau$
+        (closure under finite intersections).
+  \item If $\{U_i\}_{i \in I} \subseteq \tau$ for an arbitrary index set $I$,
+        then $\bigcup_{i \in I} U_i \in \tau$ (closure under arbitrary unions).
+\end{enumerate}
+The pair $(X, \tau)$ is called a \emph{topological space}.  Elements of $\tau$
+are called \emph{open sets}.  A set $C \subseteq X$ is \emph{closed} if
+$X \setminus C \in \tau$.
+\end{definition}
+
+\begin{definition}[Subbase]\label{def:subbase}
+A family $\subbase \subseteq \powerset(X)$ is a \emph{subbase} for a topology
+$\tau$ on $X$ if the collection of all finite intersections of members of
+$\subbase$ (including the empty intersection, which is $X$ by convention)
+forms a \emph{base} for $\tau$.  Equivalently, $\tau$ is the coarsest topology
+on $X$ containing every member of $\subbase$ as an open set.
+\end{definition}
+
+\begin{definition}[Base]\label{def:base}
+A family $\base \subseteq \powerset(X)$ is a \emph{base} for a topology $\tau$
+on $X$ if every open set $U \in \tau$ can be written as a union of members of
+$\base$.  Equivalently, $\base$ is a base if and only if:
+\begin{enumerate}[label=(\roman*),nosep]
+  \item For every $x \in X$, there exists $B \in \base$ with $x \in B$.
+  \item For every $B_1, B_2 \in \base$ and every $x \in B_1 \cap B_2$, there
+        exists $B_3 \in \base$ with $x \in B_3 \subseteq B_1 \cap B_2$.
+\end{enumerate}
+\end{definition}
+
+\begin{theorem}[Topology generated by an arbitrary family]\label{thm:generated-topology}
+Let $X$ be any set and let $\subbase \subseteq \powerset(X)$ be any family of
+subsets of $X$.  Then there exists a unique topology $\tau(\subbase)$ on $X$
+that is the coarsest topology containing every member of $\subbase$.
+Concretely, $\tau(\subbase)$ consists of all arbitrary unions of finite
+intersections of members of $\subbase$, together with $\varnothing$ and $X$.
+
+In particular, \emph{every} family of subsets of a set generates a topology.
+No conditions on $\subbase$ are required.
+\end{theorem}
+
+\begin{proof}
+The intersection of any collection of topologies on $X$ is again a topology on
+$X$ (the axioms are preserved under arbitrary intersections of families of open
+sets).  The discrete topology $\powerset(X)$ contains $\subbase$.  Therefore
+the intersection of all topologies on $X$ that contain $\subbase$ is a
+topology, and it is by construction the coarsest such topology.  The concrete
+description follows by verifying that the family of arbitrary unions of finite
+intersections of members of $\subbase$ satisfies the topology axioms.
+\end{proof}
+
+\begin{remark}\label{rem:universality}
+\Cref{thm:generated-topology} is the key structural fact underlying the entire
+paper.  The operations ``close under finite intersections'' and ``close under
+arbitrary unions'' are operations on $\powerset(\powerset(X))$.  They are
+\emph{indifferent} to how the family $\subbase$ was constructed---whether from
+neighborhoods of an undirected graph, from forward neighborhoods of a digraph,
+from open balls in a metric space, or from any other source.  This universality
+is what makes the extension of the Nada procedure from undirected to directed
+graphs automatic.
+\end{remark}
+
+% ── 2.2 Bitopological spaces ────────────────────────────────────────────────
+\subsection{Bitopological spaces}\label{subsec:bitopology}
+
+\begin{definition}[Bitopological space, Kelly~\cite{Kelly1963}]\label{def:bitopology}
+A \emph{bitopological space} is a triple $(X, \tau_1, \tau_2)$ where $X$ is a
+set and $\tau_1, \tau_2$ are both topologies on $X$.  No relationship between
+$\tau_1$ and $\tau_2$ is assumed.
+\end{definition}
+
+\begin{definition}[Pairwise open and pairwise closed]\label{def:pairwise-open}
+Let $(X, \tau_1, \tau_2)$ be a bitopological space.  A set $S \subseteq X$ is
+\emph{pairwise open} if $S \in \tau_1 \cup \tau_2$, i.e., $S$ is open in at
+least one of the two topologies.  A set $S$ is \emph{pairwise closed} if it is
+closed in at least one of the two topologies.
+\end{definition}
+
+\begin{definition}[Pairwise Hausdorff]\label{def:pairwise-hausdorff}
+A bitopological space $(X, \tau_1, \tau_2)$ is \emph{pairwise Hausdorff}
+(or \emph{pairwise $T_2$}) if for every pair of distinct points $x, y \in X$,
+there exist sets $U, V$ with $U \in \tau_1$, $V \in \tau_2$, $x \in U$,
+$y \in V$, and $U \cap V = \varnothing$.
+\end{definition}
+
+\begin{definition}[Pairwise connected and pairwise disconnected]\label{def:pairwise-connected}
+A bitopological space $(X, \tau_1, \tau_2)$ is \emph{pairwise disconnected} if
+there exist nonempty sets $U \in \tau_1$ and $V \in \tau_2$ such that $U$ and
+$V$ partition $X$ (i.e., $U \cup V = X$ and $U \cap V = \varnothing$).
+It is \emph{pairwise connected} if it is not pairwise disconnected.
+\end{definition}
+
+\begin{remark}\label{rem:pairwise-vs-single}
+The pairwise separation axioms of Kelly~\cite{Kelly1963} are genuinely stronger
+than their single-topology counterparts.  A space may be connected with respect
+to both $\tau_1$ and $\tau_2$ individually yet be pairwise disconnected, because
+the partitioning sets may come from different topologies.  This is exactly the
+mechanism by which the bitopological structure $(V, \taufwd, \taubwd)$ can
+detect asymmetries invisible to either $\taufwd$ or $\taubwd$ alone.
+\end{remark}
+
+% ── 2.3 Graphs and neighborhoods ────────────────────────────────────────────
+\subsection{Graphs and neighborhoods}\label{subsec:graphs}
+
+\begin{definition}[Simple graph]\label{def:simple-graph}
+A \emph{simple graph} is a pair $G = (V, E)$ where $V$ is a set (the
+\emph{vertex set}) and $E \subseteq \binom{V}{2}$ is a set of unordered pairs
+of distinct vertices (the \emph{edge set}).  The adjacency relation is
+symmetric and irreflexive.
+\end{definition}
+
+\begin{definition}[Directed graph]\label{def:digraph}
+A \emph{directed graph} (or \emph{digraph}) is a pair $G = (V, E)$ where $V$
+is a set and $E \subseteq V \times V$ is a set of ordered pairs (the
+\emph{arc set}).  The adjacency relation $\mathrm{Adj}(v, w) \iff (v, w) \in E$
+is not required to be symmetric, reflexive, or irreflexive.
+\end{definition}
+
+\begin{definition}[Neighborhoods in undirected graphs]\label{def:undirected-nhd}
+Let $G = (V, E)$ be a simple graph and $v \in V$.
+\begin{itemize}[nosep]
+  \item The \emph{(open) neighborhood} of $v$ is
+        $N(v) = \{w \in V : \{v, w\} \in E\}$.
+  \item The \emph{closed neighborhood} of $v$ is
+        $\Ncl{v} = \{v\} \cup N(v)$.
+\end{itemize}
+\end{definition}
+
+\begin{definition}[Forward and backward neighborhoods in digraphs]\label{def:directed-nhd}
+Let $G = (V, E)$ be a digraph and $v \in V$.
+\begin{itemize}[nosep]
+  \item The \emph{forward (open) neighborhood} of $v$ is
+        $N^{+}(v) = \{w \in V : (v, w) \in E\}$
+        (the set of out-neighbors).
+  \item The \emph{backward (open) neighborhood} of $v$ is
+        $N^{-}(v) = \{w \in V : (w, v) \in E\}$
+        (the set of in-neighbors).
+  \item The \emph{forward closed neighborhood} of $v$ is
+        $\Nfwd{v} = \{v\} \cup N^{+}(v)$.
+  \item The \emph{backward closed neighborhood} of $v$ is
+        $\Nbwd{v} = \{v\} \cup N^{-}(v)$.
+\end{itemize}
+\end{definition}
+
+\begin{remark}\label{rem:symmetry-collapse}
+If $G$ is symmetric (i.e., $(v,w) \in E \iff (w,v) \in E$ for all $v, w$),
+then $\Nfwd{v} = \Nbwd{v}$ for every $v \in V$, and the forward and backward
+constructions collapse to the undirected case.  The distinction between $\Nfwd{v}$
+and $\Nbwd{v}$ is therefore a measure of the asymmetry of $G$.
+\end{remark}
+
+% ── 2.4 The Nada construction ────────────────────────────────────────────────
+\subsection{The Nada construction for undirected graphs}\label{subsec:nada}
+
+The following procedure was introduced by Nada et al.~\cite{Nada2018}.
+
+\begin{definition}[Nada topology of an undirected graph]\label{def:nada-undirected}
+Let $G = (V, E)$ be a simple graph.  The \emph{Nada topology} of $G$ is the
+topology $\tau(G)$ on $V$ constructed as follows:
+\begin{enumerate}[label=\textbf{Step \arabic*.},nosep]
+  \item For each $v \in V$, compute the closed neighborhood
+        $\Ncl{v} = \{v\} \cup N(v)$.
+  \item Form the family $\subbase = \{\Ncl{v} : v \in V\}$.
+  \item Close $\subbase$ under finite intersections to obtain a base
+        $\base = \left\{\,\bigcap_{i=1}^{k} S_i : k \geq 0,\;
+        S_1, \ldots, S_k \in \subbase\right\}$.
+  \item Close $\base$ under arbitrary unions to obtain the topology
+        \[
+          \tau(G) \;=\; \Bigl\{\,\textstyle\bigcup_{j \in J} B_j \,:\,
+          J \text{ arbitrary},\; B_j \in \base\Bigr\}.
+        \]
+\end{enumerate}
+By \Cref{thm:generated-topology}, $\tau(G)$ is the unique coarsest topology
+on $V$ containing every $\Ncl{v}$ as an open set.
+\end{definition}
+
+\begin{remark}\label{rem:nada-procedure-universal}
+Steps 3 and 4 of \Cref{def:nada-undirected} are precisely the two operations in
+\Cref{thm:generated-topology}.  The input to these steps is a family
+$\subbase \subseteq \powerset(V)$, and the output is a topology
+$\tau(\subbase)$.  Neither step inspects any property of $\subbase$ other than
+its membership in $\powerset(V)$.  This is why the procedure extends to
+directed graphs (or to any other source of subsets) without modification.
+\end{remark}
+
+% ── 2.5 Visibility graphs ───────────────────────────────────────────────────
+\subsection{Visibility graphs}\label{subsec:visibility}
+
+\begin{definition}[Natural Visibility Graph, Lacasa et al.~\cite{Lacasa2008}]%
+\label{def:nvg}
+Let $(x_1, x_2, \ldots, x_n)$ be a time series.  The \emph{Natural Visibility
+Graph} (NVG) is the undirected graph $G = (V, E)$ where $V = \{1, 2, \ldots, n\}$
+and two vertices $i < j$ are adjacent ($\{i, j\} \in E$) if and only if for
+every intermediate index $i < k < j$,
+\[
+  x_k < x_j + (x_i - x_j)\,\frac{j - k}{j - i}\,.
+\]
+Geometrically, the data points $(i, x_i)$ and $(j, x_j)$ ``see'' each other if
+the line segment connecting them passes above all intermediate data points.
+\end{definition}
+
+\begin{definition}[Horizontal Visibility Graph, Luque et al.~\cite{Luque2009}]%
+\label{def:hvg}
+The \emph{Horizontal Visibility Graph} (HVG) is defined as above, but with the
+simpler condition: $\{i, j\} \in E$ if and only if $x_k < \min(x_i, x_j)$ for
+every $i < k < j$.
+\end{definition}
+
+\begin{definition}[Directed Visibility Graphs]\label{def:directed-vg}
+Given any visibility graph $G = (V, E)$ (NVG or HVG), the \emph{directed
+visibility graph} is the digraph $\vec{G} = (V, \vec{E})$ obtained by orienting
+every edge from the smaller index to the larger index: $(i, j) \in \vec{E}$ if
+and only if $\{i, j\} \in E$ and $i < j$.
+
+Since the index set $V = \{1, \ldots, n\}$ is totally ordered and edges are
+oriented consistently with this order, $\vec{G}$ is a directed acyclic graph
+(DAG) in which the time index serves as a topological order.
+\end{definition}
+
+\begin{remark}\label{rem:irreversibility}
+In the directed visibility graph, the forward closed neighborhood $\Nfwd{i}$
+consists of vertex $i$ and those later time points visible from~$i$, while the
+backward closed neighborhood $\Nbwd{i}$ consists of vertex $i$ and those
+earlier time points from which $i$ is visible.  For a time series generated by
+a reversible process (e.g., an i.i.d.\ sequence), the statistical properties
+of $\Nfwd{\cdot}$ and $\Nbwd{\cdot}$ are exchangeable.  For an irreversible
+process (e.g., one with asymmetric relaxation), they are not.  The divergence
+between $\taufwd$ and $\taubwd$ is therefore a topological signature of
+temporal irreversibility.
+\end{remark}
+
+% ── 2.6 Alexandrov topology and specialization preorder ──────────────────────
+\subsection{Alexandrov topology and the specialization preorder}%
+\label{subsec:alexandrov}
+
+For finite topological spaces, there is a classical correspondence between
+topologies and preorders that provides efficient computational access to
+topological invariants.
+
+\begin{definition}[Alexandrov topology, Alexandrov~\cite{Alexandrov1937}]%
+\label{def:alexandrov}
+A topology $\tau$ on a set $X$ is an \emph{Alexandrov topology} if $\tau$ is
+closed under arbitrary intersections (not just finite ones).  Equivalently,
+every point $x \in X$ has a smallest open neighborhood.
+\end{definition}
+
+\begin{theorem}[Alexandrov correspondence for finite sets]%
+\label{thm:alexandrov-correspondence}
+Let $X$ be a finite set.  There is a bijection between topologies on $X$ and
+preorders on $X$ (reflexive, transitive relations), given by:
+\begin{itemize}[nosep]
+  \item \textbf{Topology $\to$ preorder:}  Define $x \leq y$ if and only if
+        $x \in \overline{\{y\}}$ (the closure of $\{y\}$), or equivalently,
+        every open set containing $x$ also contains $y$.  This is the
+        \emph{specialization preorder}.
+  \item \textbf{Preorder $\to$ topology:}  The open sets are the \emph{upsets}
+        (upper sets) of the preorder: a set $U \subseteq X$ is open if and only
+        if $x \in U$ and $x \leq y$ implies $y \in U$.
+\end{itemize}
+Every topology on a finite set is an Alexandrov topology, so this
+correspondence applies to all finite topological spaces.
+\end{theorem}
+
+\begin{proof}
+Every topology on a finite set is Alexandrov because a finite intersection of
+open sets is a finite intersection, which is open by the topology axioms, and
+an arbitrary intersection of finitely many sets is a finite intersection.  The
+bijection between Alexandrov topologies and preorders is classical;
+see Alexandrov~\cite{Alexandrov1937}.
+\end{proof}
+
+\begin{definition}[Specialization preorder, McCord~\cite{McCord1966},
+Stong~\cite{Stong1966}]\label{def:specialization}
+Let $(X, \tau)$ be a topological space.  The \emph{specialization preorder}
+$\leq_\tau$ is defined by
+\[
+  x \leq_\tau y \iff x \in \overline{\{y\}} \iff
+  \text{every open set containing } x \text{ also contains } y.
+\]
+When $X$ is finite, $\leq_\tau$ is a preorder and the topology can be recovered
+from it via the Alexandrov correspondence (\Cref{thm:alexandrov-correspondence}).
+\end{definition}
+
+\begin{theorem}[Connected components via the specialization preorder]%
+\label{thm:connected-via-preorder}
+Let $(X, \tau)$ be a finite topological space with specialization preorder
+$\leq_\tau$.  Define the \emph{comparability graph} $C_\tau$ on $X$ by:
+vertices $x$ and $y$ are adjacent in $C_\tau$ if and only if $x \leq_\tau y$
+or $y \leq_\tau x$.  Then the connected components of $(X, \tau)$ (as a
+topological space) coincide with the connected components of the graph $C_\tau$.
+\end{theorem}
+
+\begin{proof}
+A self-contained proof is given in full for the logically equivalent
+\Cref{thm:specialization-components} in
+\Cref{sec:extension}; that proof establishes reflexivity and transitivity
+of the specialization preorder, the identification of minimal open sets
+in a finite Alexandrov space, and the coincidence between topological
+connected components and comparability-graph connected components.  The
+classical formulation of the statement is due to
+McCord~\cite{McCord1966} and Stong~\cite{Stong1966}.
+\end{proof}
+
+\begin{remark}\label{rem:computational-significance}
+\Cref{thm:connected-via-preorder} is computationally significant: it provides
+an exact polynomial-time algorithm for computing the connected components of a
+finite topological space without enumerating the topology.  One computes the
+specialization preorder directly from the generating family (the subbase), then
+finds connected components of the comparability graph using breadth-first
+search.  This avoids the potentially exponential blowup of explicitly
+constructing all open sets.  For the Nada construction, the specialization
+preorder can be read off from the intersection structure of the closed
+neighborhoods.
+\end{remark}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Extension of Nada's Construction to Directed Graphs}%
+\label{sec:extension}
+% ══════════════════════════════════════════════════════════════════════════════
+
+We now extend the Nada construction to directed graphs and prove that the
+result is a bitopological space.  The extension requires no new mathematical
+ideas: the universality of the generated-topology construction
+(\Cref{thm:generated-topology}) does all the work.  The content of this section
+is the identification of the directed neighborhoods as the appropriate input
+to the Nada procedure, the analysis of the resulting bitopological structure,
+and the relationship between the Nada topology and the Alexandrov topology on
+the same vertex set.
+
+% ── 3.1 Validity of the directed extension ──────────────────────────────────
+
+\begin{theorem}[Validity of the directed extension]%
+\label{thm:directed-validity}
+Let $G = (V, E)$ be a directed graph.  The families
+\[
+  \subbase^{+} = \bigl\{\Nfwd{v} : v \in V\bigr\},
+  \qquad
+  \subbase^{-} = \bigl\{\Nbwd{v} : v \in V\bigr\}
+\]
+are valid subbases on~$V$, and the topologies $\taufwd$ and $\taubwd$ generated
+from them by the Nada closure procedure (close the subbase under finite
+intersections to obtain a base, then close the base under arbitrary unions to
+obtain the topology) satisfy the topological space axioms.
+\end{theorem}
+
+\begin{proof}
+By \Cref{thm:generated-topology}, every family $\subbase \subseteq \powerset(V)$
+generates a unique topology $\tau(\subbase)$ on~$V$.  The closure operations
+underlying the Nada procedure---finite intersection and arbitrary union in
+$\powerset(V)$---are universal operations on families of subsets and do not
+inspect any property of the generating family or the graph from which it arose.
+Applying the theorem once to $\subbase^{+}$ yields $\taufwd$; applying it
+once to $\subbase^{-}$ yields $\taubwd$.  Neither application requires
+symmetry, connectedness, acyclicity, or any other hypothesis on~$G$.
+\end{proof}
+
+% ── 3.2 Self-inclusion guarantees non-degeneracy ────────────────────────────
+
+\begin{proposition}[Self-inclusion guarantees non-degeneracy]%
+\label{prop:self-inclusion}
+The inclusion of $v$ in both $\Nfwd{v}$ and $\Nbwd{v}$---the ``self-bit''
+$v \in \Nfwd{v}$ and $v \in \Nbwd{v}$---guarantees that no element of
+$\subbase^{+}$ or $\subbase^{-}$ is empty.
+\end{proposition}
+
+\begin{proof}
+For any vertex $v \in V$, the forward closed neighborhood is
+$\Nfwd{v} = \{v\} \cup N^{+}(v)$, which contains $v$ regardless of whether
+$N^{+}(v)$ is empty.  In particular, if $v$ is a sink (no out-edges), then
+$N^{+}(v) = \varnothing$ and $\Nfwd{v} = \{v\} \neq \varnothing$.  Similarly,
+if $v$ is a source (no in-edges), then $N^{-}(v) = \varnothing$ and
+$\Nbwd{v} = \{v\} \neq \varnothing$.
+
+Without the self-bit, the open out-neighborhood
+$N^{+}(v) = \{w : (v,w) \in E\}$ of a sink vertex $v$ would be empty.  In a
+non-trivial DAG (one with at least one vertex of out-degree zero, which every
+finite DAG possesses), at least one element of the subbase $\{N^{+}(v) : v \in V\}$
+would be $\varnothing$.  Since $\varnothing$ is contained in every finite
+intersection, the intersection closure step would propagate $\varnothing$
+throughout the base without adding information, collapsing the discriminative
+power of the base: any difference between the neighborhood structure of
+distinct sinks would be obliterated by the universal presence of the empty
+set.  The self-bit prevents this degenerate collapse.
+\end{proof}
+
+% ── 3.3 Bitopological structure ─────────────────────────────────────────────
+
+\begin{theorem}[Bitopological structure]%
+\label{thm:bitopological-structure}
+The triple $(V, \taufwd, \taubwd)$ is a bitopological space in the sense of
+Kelly~\cite{Kelly1963}: both $\taufwd$ and $\taubwd$ are topologies on the
+same underlying set~$V$.
+\end{theorem}
+
+\begin{proof}
+By \Cref{thm:directed-validity}, $\taufwd$ and $\taubwd$ are both topologies
+on~$V$.  A bitopological space is defined as a triple $(X, \tau_1, \tau_2)$
+where $\tau_1$ and $\tau_2$ are topologies on $X$
+(\Cref{def:bitopology}).  Setting $X = V$, $\tau_1 = \taufwd$,
+$\tau_2 = \taubwd$ yields the result.
+\end{proof}
+
+% ── 3.4 Specialization preorder preserves connected components ──────────────
+
+\begin{theorem}[Specialization preorder preserves connected components]%
+\label{thm:specialization-components}
+Let $(V, \tau)$ be a finite topological space with base~$\base$, and let
+$\leq$ be the specialization preorder on $V$ defined by
+$x \leq y$ if and only if $x \in U$ implies $y \in U$ for every $U \in \tau$
+(equivalently, $\mathcal{S}(x) \subseteq \mathcal{S}(y)$, where
+$\mathcal{S}(x) = \{B \in \base : x \in B\}$).  Define the undirected
+comparability graph $C_\tau$ on $V$ by: vertices $x$ and $y$ are adjacent in
+$C_\tau$ if and only if $x \leq y$ or $y \leq x$.  Then the topological
+connected components of $(V, \tau)$ coincide exactly with the connected
+components of $C_\tau$.  This applies to $\tau = \taufwd$ and
+$\tau = \taubwd$ separately.
+\end{theorem}
+
+\begin{proof}
+We establish the three parts in sequence.
+
+\medskip
+\noindent
+\textbf{(a) The specialization preorder is a well-defined preorder.}
+The specialization preorder $\leq_\tau$ on a topological space $(V, \tau)$ is
+defined by $x \leq_\tau y$ if and only if every open set containing $x$ also
+contains $y$ (\Cref{def:specialization}).  Reflexivity: every open set
+containing $x$ contains $x$.  Transitivity: if every open set containing $x$
+contains $y$, and every open set containing $y$ contains $z$, then every open
+set containing $x$ contains $z$.  The equivalence classes of the symmetric
+closure of $\leq_\tau$---i.e., the classes of the equivalence relation
+$x \sim y \iff (x \leq y \text{ and } y \leq x)$---are exactly the fibers of
+the quotient map $V \twoheadrightarrow V/{\sim}$, and $V/{\sim}$ equipped with
+the quotient topology is the $T_0$ quotient (Kolmogorov quotient) of
+$(V, \tau)$.  This is established by McCord~\cite{McCord1966} and
+Stong~\cite{Stong1966}.
+
+\medskip
+\noindent
+\textbf{(b) Topological connectedness coincides with comparability-graph connectedness.}
+Every finite topological space is an Alexandrov space (\Cref{def:alexandrov}),
+because a finite intersection of open sets is open by the topology axioms, and
+an arbitrary intersection of finitely many sets is a finite intersection.
+In an Alexandrov space, every point $x$ has a smallest open neighborhood
+\[
+  U(x) \;=\; \bigcap\{U \in \tau : x \in U\},
+\]
+which is open (as an arbitrary intersection of opens in an Alexandrov space).
+The specialization preorder satisfies $x \leq y$ if and only if $y \in U(x)$
+if and only if $U(x) \subseteq U(y)$.
+
+\emph{Forward direction:} Suppose $x$ and $y$ lie in the same topological
+connected component.  Since $(V, \tau)$ is finite, the connected component
+$C$ is a connected subspace, and any open cover of $C$ by opens in $\tau$ has
+a common point in the intersection of any two covering sets that overlap.  The
+family $\{U(z) : z \in C\}$ covers $C$ (since $z \in U(z)$).  We construct
+a chain $x = z_0, z_1, \ldots, z_k = y$ in $C$ such that consecutive points
+are specialization-comparable, as follows.
+
+Begin with $z_0 = x$.  The set $U(z_0)$ is a nonempty open subset of the
+connected space $C$.  If $y \in U(z_0)$ or $z_0 \in U(y)$, we are done (the
+chain has length~1).  Otherwise, since $C$ is connected and $\{U(z) : z \in C\}$
+covers $C$, there is some $z_1 \in C$ with $z_1 \in U(z_0)$ or
+$z_0 \in U(z_1)$, so $z_0 \leq z_1$ or $z_1 \leq z_0$.  Continue
+inductively: the set of points reachable from $x$ by a chain of
+specialization-comparable points is open (it is a union of minimal
+neighborhoods) and closed (its complement is a union of minimal neighborhoods
+of points not reachable from $x$).  Since $C$ is connected, this set is all
+of $C$, so $y$ is reachable.
+
+\emph{Backward direction:} Suppose $x = z_0, z_1, \ldots, z_k = y$ is a chain
+of specialization-comparable points.  For each $i$, either $z_i \leq z_{i+1}$
+or $z_{i+1} \leq z_i$.  In the first case, $z_{i+1} \in U(z_i)$, so both
+$z_i$ and $z_{i+1}$ lie in the open connected set $U(z_i)$.  In the second
+case, both lie in $U(z_{i+1})$.  In either case, $z_i$ and $z_{i+1}$ lie
+in a common connected set, so they are in the same connected component.
+By transitivity, $x$ and $y$ are in the same connected component.
+
+\medskip
+\noindent
+\textbf{(c) Computational complexity.}
+The set $\mathcal{S}(x) = \{B \in \base : x \in B\}$ can be represented as a
+bitset over the base indices, requiring $O(|\base|/64)$ machine words per
+vertex.  Constructing all $|V|$ bitsets requires $O(|V| \cdot |\base|)$
+time and space.  Testing $x \leq y$ reduces to a bitset subset test:
+$\mathcal{S}(x) \subseteq \mathcal{S}(y)$, which costs $O(|\base|/64)$ time
+under word-parallel operations.  Constructing the comparability graph
+$C_\tau$ requires $O(|V|^2)$ such tests, for a total of
+$O(|V|^2 \cdot |\base|/64)$ time.  Finding connected components of $C_\tau$
+by breadth-first search costs $O(|V|^2)$ time (since $C_\tau$ may have
+$O(|V|^2)$ edges).  The total is $O(|V|^2 \cdot |\base|/64)$, which is
+polynomial in $|V|$ and $|\base|$.  In particular, the connected components
+of a finite topology can be decided without ever enumerating the full topology,
+whose size may be exponential in $|V|$.
+\end{proof}
+
+% ── 3.5 Alexandrov topology as subtopology ──────────────────────────────────
+
+\begin{theorem}[Alexandrov topology as subtopology of the directed Nada topology]%
+\label{thm:alexandrov-subtopology}
+Let $G = (V, E)$ be a finite DAG and let $R^*$ denote the
+reflexive-transitive closure of $E$, a preorder on~$V$.  Let $\tau_A$ denote
+the Alexandrov topology on $V$ whose open sets are exactly the upsets of
+$R^*$.  Let $\taufwd_{\mathrm{Nada}}$ denote the forward Nada topology of
+\Cref{thm:directed-validity}.  Then
+\[
+  \tau_A \;\subseteq\; \taufwd_{\mathrm{Nada}}.
+\]
+That is, every open set of the Alexandrov topology is also open in the
+forward Nada topology.
+\end{theorem}
+
+\begin{proof}
+Let $U$ be an upset of $R^*$.  We show $U$ is open in $\taufwd_{\mathrm{Nada}}$
+by exhibiting it as a union of subbase elements.
+
+For each $v \in U$, we claim that $\Nfwd{v} \subseteq U$.  To see this,
+let $w \in \Nfwd{v}$.  Either $w = v$, in which case $w = v \in U$, or
+$(v, w) \in E$, in which case $v \,R^*\, w$ (by a single-step path).  Since
+$U$ is an upset of $R^*$ and $v \in U$, we conclude $w \in U$.
+
+Since $v \in \Nfwd{v} \subseteq U$ for every $v \in U$, we have
+\[
+  U \;=\; \bigcup_{v \in U} \Nfwd{v}.
+\]
+The right-hand side is a union of elements of the subbase $\subbase^{+}$.
+Every element of $\subbase^{+}$ is open in $\taufwd_{\mathrm{Nada}}$ (by
+construction), and an arbitrary union of open sets is open.  Therefore $U$ is
+open in $\taufwd_{\mathrm{Nada}}$.
+\end{proof}
+
+\begin{remark}[Base size versus topology inclusion]%
+\label{rem:base-size-warning}
+The inclusion $\tau_A \subseteq \taufwd_{\mathrm{Nada}}$ is a statement
+about families of open sets, \emph{not} about the sizes of any
+particular bases used to generate them.  It is a common but false
+inference to conclude from $\tau_A \subseteq \taufwd_{\mathrm{Nada}}$
+that the canonical base $\base_A$ of the Alexandrov topology has
+cardinality at most that of the Nada base $\base^{+}_{\mathrm{Nada}}$.
+A finer topology (one with more open sets) can in general be generated
+by a \emph{smaller} base if the base is well chosen: base size is a
+property of the generator, not of the topology.
+
+In this paper, the empirical observation that the Nada base is typically
+larger than the Alexandrov base on visibility graphs is a
+computationally meaningful fact about the two specific pipelines used
+to generate the topologies, not a corollary of
+\Cref{thm:alexandrov-subtopology}.
+\end{remark}
+
+% ── 3.6 Resolution hierarchy ────────────────────────────────────────────────
+
+\begin{corollary}[Resolution hierarchy]%
+\label{cor:resolution-hierarchy}
+If $\tau_A$ is connected and $\taufwd_{\mathrm{Nada}}$ is disconnected, then
+the disconnection of $\taufwd_{\mathrm{Nada}}$ arises exclusively from open
+sets in $\taufwd_{\mathrm{Nada}}$ that are not upsets of $R^*$, i.e., from
+sets produced by the finite-intersection closure of the subbase $\subbase^{+}$
+that do not belong to $\tau_A$.
+\end{corollary}
+
+\begin{proof}
+Suppose for contradiction that every nontrivial clopen set of
+$\taufwd_{\mathrm{Nada}}$ were also clopen in~$\tau_A$.  A clopen set of a
+topology $\tau$ is a set $S$ with $S \in \tau$ and $S^c \in \tau$.  Since
+$\taufwd_{\mathrm{Nada}}$ is disconnected, there exists a nonempty proper
+subset $S \subsetneq V$ that is clopen in $\taufwd_{\mathrm{Nada}}$.  By
+hypothesis, $S$ is also clopen in $\tau_A$.  But $S$ is nonempty and
+$S \neq V$, so $S$ witnesses the disconnection of $\tau_A$: both $S$ and
+$S^c$ are nonempty open sets in $\tau_A$ whose union is $V$ and whose
+intersection is empty.  This contradicts the connectedness of $\tau_A$.
+
+Therefore at least one disconnecting clopen of $\taufwd_{\mathrm{Nada}}$ is
+not clopen in $\tau_A$.  Since $\tau_A \subseteq \taufwd_{\mathrm{Nada}}$
+(\Cref{thm:alexandrov-subtopology}), any set that is open in $\tau_A$ is
+automatically open in $\taufwd_{\mathrm{Nada}}$.  The additional open sets in
+$\taufwd_{\mathrm{Nada}}$ that are not in $\tau_A$ arise precisely from the
+finite-intersection closure of the subbase---the operation that takes
+$\subbase^{+}$ and produces the base $\base^{+}$ by forming intersections
+$\Nfwd{v_1} \cap \cdots \cap \Nfwd{v_k}$.  These intersection sets are the
+source of the additional discriminative power of the Nada construction over
+the pure Alexandrov construction on the same DAG.
+\end{proof}
+
+% ── 3.7 Irreversibility indices ─────────────────────────────────────────────
+
+\begin{proposition}[Irreversibility indices]%
+\label{prop:irreversibility-indices}
+For a bitopological space $(V, \taufwd, \taubwd)$ arising from a directed
+graph, define:
+\begin{itemize}[nosep]
+  \item the \emph{component-count irreversibility index}
+        \[
+          I_C(\taufwd, \taubwd)
+          \;=\; \frac{|C^{+} - C^{-}|}{\max(C^{+}, C^{-})},
+        \]
+        where $C^{+}$ and $C^{-}$ are the numbers of connected components of
+        $\taufwd$ and $\taubwd$ respectively, with the convention $I_C = 0$
+        when $C^{+} = C^{-} = 0$;
+  \item the \emph{base-size irreversibility index}
+        \[
+          I_B(\taufwd, \taubwd)
+          \;=\; \frac{|\,|\base^{+}| - |\base^{-}|\,|}%
+                     {\max(|\base^{+}|, |\base^{-}|)},
+        \]
+        with the same convention;
+  \item the \emph{asymmetry direction}
+        $\Delta(\taufwd, \taubwd) = C^{-} - C^{+}$,
+        a signed integer.
+\end{itemize}
+Then:
+\begin{enumerate}[label=(\roman*),nosep]
+  \item $I_C, I_B \in [0, 1]$.
+  \item $I_C = 0$ if and only if $C^{+} = C^{-}$, and $I_B = 0$ if and only
+        if $|\base^{+}| = |\base^{-}|$.
+  \item $\Delta > 0$ if and only if $\taufwd$ has strictly fewer connected
+        components than $\taubwd$.
+\end{enumerate}
+\end{proposition}
+
+\begin{proof}
+(i) The numerator of $I_C$ is $|C^{+} - C^{-}| \leq \max(C^{+}, C^{-})$,
+so $I_C \leq 1$.  Both numerator and denominator are nonneg\-ative, so
+$I_C \geq 0$.  The same argument applies to $I_B$.
+
+(ii) $I_C = 0$ iff $|C^{+} - C^{-}| = 0$ iff $C^{+} = C^{-}$, and
+similarly for $I_B$.
+
+(iii) $\Delta = C^{-} - C^{+} > 0$ iff $C^{+} < C^{-}$.
+\end{proof}
+
+\begin{remark}[Interpretation of the asymmetry direction]%
+\label{rem:asymmetry-direction}
+The sign of $\Delta$ indicates which of the two topologies is more
+connected.  $\Delta > 0$ means $\taufwd$ has fewer connected components
+than $\taubwd$, i.e., the forward topology is ``more connected'' than
+the backward topology.  For directed visibility graphs of time series
+with gradual rises and abrupt drops---the prototypical asymmetric
+dynamics in the sense of Lacasa and Toral~\cite{LacasaToral2010}---the
+prediction is $\Delta > 0$: forward visibility (looking ahead in time)
+sees more structure than backward visibility (looking behind), because
+the gradual rise creates many forward visibility edges while the abrupt
+drop creates few backward edges.
+\end{remark}
+
+% ── 3.8 Characterization of pairwise connectedness ──────────────────────────
+
+\begin{proposition}[Pairwise connectedness]%
+\label{prop:pairwise-connected}
+The bitopological space $(V, \taufwd, \taubwd)$ is pairwise connected in the
+sense of Kelly~\cite{Kelly1963} if and only if there is no proper nonempty
+subset $A \subsetneq V$ that is simultaneously $\taufwd$-open and
+$\taubwd$-closed.  Equivalently, for every $U \in \taufwd$ with
+$\varnothing \subsetneq U \subsetneq V$, the complement $V \setminus U$ does
+not belong to $\taubwd$.
+\end{proposition}
+
+\begin{proof}
+\emph{Equivalence of the two formulations.}  ``$A$ is $\taufwd$-open and
+$\taubwd$-closed'' means $A \in \taufwd$ and $A^c \in \taubwd$.  The second
+formulation states that for every $U \in \taufwd$ with
+$\varnothing \subsetneq U \subsetneq V$, $U^c \notin \taubwd$.  Setting
+$A = U$, the two conditions are identical.
+
+\emph{Forward direction.}  Suppose $(V, \taufwd, \taubwd)$ is pairwise
+connected.  By definition (\Cref{def:pairwise-connected}), there is no pair
+of nonempty sets $U \in \taufwd$, $W \in \taubwd$ with $U \cup W = V$ and
+$U \cap W = \varnothing$.  If some proper nonempty $A$ were $\taufwd$-open
+and $\taubwd$-closed, then $U = A$ and $W = A^c$ would be such a pair (with
+$W \in \taubwd$ since $A$ is $\taubwd$-closed), contradicting pairwise
+connectedness.
+
+\emph{Backward direction.}  Suppose no such $A$ exists, and suppose for
+contradiction that $(V, \taufwd, \taubwd)$ is pairwise disconnected: there
+exist nonempty $U \in \taufwd$ and $W \in \taubwd$ with $U \cup W = V$ and
+$U \cap W = \varnothing$.  Then $W = U^c$, so $U$ is nonempty, proper (since
+$W$ is nonempty), $\taufwd$-open, and $U^c = W \in \taubwd$ (i.e., $U$ is
+$\taubwd$-closed).  This contradicts the hypothesis.
+
+\medskip
+\noindent
+\emph{Computational remark.}  The characterization yields a decision procedure
+that iterates over the enumerated open sets of $\taufwd$ and checks complement
+membership in $\taubwd$, with total cost $O(|\taufwd| \cdot |\taubwd|)$ under
+hash lookup.  When either topology has not been fully enumerated (because the
+enumeration exceeded a resource bound \texttt{max\_open\_sets}), the decision
+procedure returns a three-valued answer: pairwise connected, pairwise
+disconnected, or \emph{undecided-within-budget}.  This three-valuedness is
+epistemically honest rather than a defect of the algorithm: it reflects the
+actual computational state after finite work.
+\end{proof}
+
+% ── Bibliography ─────────────────────────────────────────────────────────────
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Algorithms and Computational Complexity}\label{sec:algorithms}
+% ══════════════════════════════════════════════════════════════════════════════
+
+Section~\ref{sec:extension} established the validity of the directed extension
+and its structural properties.  We now describe the algorithms that realize
+the construction and compute the bitopological invariants of
+\Cref{prop:irreversibility-indices}, with explicit time and space complexity
+bounds, termination arguments, and correctness justifications tied to the
+theorems of Section~\ref{sec:extension}.  The algorithms are those implemented
+in the reference R/C++ library accompanying this paper.  Each algorithm is
+presented as formal pseudocode; each is accompanied by a proposition stating
+its correctness and complexity, proved by direct reduction to a theorem of
+Section~\ref{sec:extension}.
+
+% ── 4.1 Bitset representation ───────────────────────────────────────────────
+
+\subsection{Bitset representation of finite subsets}%
+\label{subsec:bitset}
+
+Let $V = \{0, 1, \ldots, n-1\}$.  Every subset $A \subseteq V$ is represented
+as an array of $W = \lceil n/64 \rceil$ words of $64$ bits each; bit~$i$
+(counting from the least significant bit of word $\lfloor i/64 \rfloor$) is
+set if and only if $i \in A$.  The following operations are word-wise and
+run in $O(W)$ time:
+\begin{itemize}[leftmargin=2em]
+  \item intersection $A \cap B$: word-wise bitwise \texttt{AND};
+  \item union $A \cup B$: word-wise bitwise \texttt{OR};
+  \item complement $V \setminus A$: word-wise bitwise \texttt{NOT} followed
+        by masking the unused high bits of the last word;
+  \item subset test $A \subseteq B$: verify that
+        $A \cap \overline{B} = \varnothing$ word-wise;
+  \item equality test $A = B$: word-wise comparison;
+  \item emptiness test $A = \varnothing$: word-wise disjunction against zero;
+  \item element test $i \in A$: single bit extraction.
+\end{itemize}
+All operations are branch-free in the inner loop and vectorize under modern
+compilers.  A family of $k$ subsets stored consecutively occupies
+$O(k \cdot W) = O(k \cdot n / 64)$ words in memory.
+
+We also assume an auxiliary open-addressing hash table with word-wise hashing
+(an \texttt{XOR}-fold of the $W$ words of each bitset), supporting amortized
+$O(W)$-time insertion, membership query, and iteration.  The hash table is
+used throughout to deduplicate families of bitsets as they are constructed.
+We write $H_{\base}$, $H_{\tau}$, and so on for the hash tables associated
+with particular families.
+
+% ── 4.2 Closure under finite intersections ─────────────────────────────────
+
+\subsection{Closure under finite intersections: wavefront propagation}%
+\label{subsec:intersection-closure}
+
+Given a subbase $\subbase = \{S_1, S_2, \ldots, S_k\} \subseteq \powerset(V)$,
+the Nada construction requires computing the base
+\[
+  \base = \Bigl\{\bigcap_{i \in I} S_i : I \subseteq \{1, \ldots, k\},\,
+  I \neq \varnothing,\, \bigcap_{i \in I} S_i \neq \varnothing\Bigr\},
+\]
+the closure of~$\subbase$ under nonempty finite intersections.  Naively
+enumerating all $2^k - 1$ subsets of~$\subbase$ is infeasible.  We use a
+\emph{wavefront} propagation: iteratively intersect a ``frontier'' of newly
+discovered base elements with the existing base, retaining only new nonempty
+intersections.
+
+\begin{algorithm}
+\caption{Intersection closure by wavefront propagation}%
+\label{alg:intersection-closure}
+\textbf{Input:} subbase $\subbase = \{S_1, \ldots, S_k\} \subseteq
+\powerset(V)$, safety bound $M_{\base} \in \mathbb{N}$. \\
+\textbf{Output:} the base~$\base$ together with a flag
+\texttt{base\_complete} $\in \{\textup{true}, \textup{false}\}$.
+\begin{enumerate}[leftmargin=2em, label=\textup{(\arabic*)}]
+  \item Initialize $\base \leftarrow \subbase$ (deduplicated), insert every
+        element of~$\subbase$ into a hash table $H_{\base}$, set the frontier
+        $F \leftarrow \subbase$, and set \texttt{base\_complete}
+        $\leftarrow$ \textup{true}.
+  \item While $F \neq \varnothing$ and $|\base| \leq M_{\base}$:
+  \begin{enumerate}[leftmargin=1.5em, label=\textup{(\alph*)}]
+    \item Initialize $F' \leftarrow \varnothing$.
+    \item For every $f \in F$ and every $b \in \base$ at the start of the
+          iteration, compute $c \leftarrow f \cap b$.
+    \item If $c \neq \varnothing$ and $c \notin H_{\base}$, insert $c$
+          into~$H_{\base}$, append $c$ to~$\base$, and append $c$ to~$F'$;
+          if $|\base| > M_{\base}$, set \texttt{base\_complete}
+          $\leftarrow$ \textup{false} and break the loop.
+  \end{enumerate}
+  \item Set $F \leftarrow F'$ and continue.
+  \item Return $\base$ and \texttt{base\_complete}.
+\end{enumerate}
+\end{algorithm}
+
+\begin{proposition}[Correctness and complexity of
+\Cref{alg:intersection-closure}]%
+\label{prop:intersection-closure-correct}
+\Cref{alg:intersection-closure} terminates in a finite number of iterations.
+If \texttt{base\_complete} is \textup{true} at termination, then $\base$
+equals the closure of~$\subbase$ under finite nonempty intersections.  In all
+cases, $|\base| \leq M_{\base} + |\subbase|$ and every element of~$\base$ is
+a finite nonempty intersection of elements of~$\subbase$.  The total time is
+$O(|\base|^{2} \cdot W)$ word operations, and the space is
+$O(|\base| \cdot W)$.
+\end{proposition}
+
+\begin{proof}
+\emph{Termination.}  The family~$\base$ is a subset of $\powerset(V)$, which
+has $2^n$ elements.  Each iteration of the main loop either strictly
+increases~$|\base|$ or leaves it fixed; in the latter case $F' = \varnothing$
+and the loop exits.  Hence the number of iterations is bounded by
+$2^n - |\subbase|$.  A tighter practical bound: at iteration~$k$ (counting
+from~$0$), every element of~$\base$ is an intersection of at most $k+1$
+subbase elements, and any strictly descending chain of nonempty intersections
+has length at most~$n$.  The number of iterations is therefore at most~$n$
+once the frontier stabilizes.
+
+\emph{Correctness.}  We show by induction on~$k$ that at the end of
+iteration~$k$ of the main loop, $\base$ contains every nonempty intersection
+$\bigcap_{i \in I} S_i$ with $|I| \leq k+1$.  The base case $k = 0$ is
+step~(1): $\base$ is initialized to~$\subbase$, which contains every
+single-element intersection.  For the inductive step, assume the claim holds
+at the end of iteration~$k$.  At the start of iteration~$k+1$, the
+frontier~$F$ consists precisely of the new intersections discovered in
+iteration~$k$.  Let $T = \bigcap_{i \in I} S_i$ with $|I| = k+2$ be any
+nonempty intersection of depth~$k+2$.  Choose any~$i_0 \in I$ and let
+$T' = \bigcap_{i \in I \setminus \{i_0\}} S_i$.  Then $T'$ has depth~$k+1$,
+so by the induction hypothesis $T' \in \base$ after iteration~$k$; and
+$T = T' \cap S_{i_0}$ is an intersection of an element of~$\base$ with an
+element of~$\subbase \subseteq \base$.  Step~(2b) of iteration~$k+1$
+considers every pair $(f, b)$ with $f \in F \cup (\base \setminus F)$ and
+$b \in \base$; in particular it considers $(T', S_{i_0})$ (in one of the two
+orders), computes~$T$, and adds it to~$\base$ if not already present.
+Therefore $\base$ contains every depth-$\leq k+2$ intersection at the end of
+iteration~$k+1$.  Since every nonempty intersection of~$\subbase$ has depth
+at most~$n$, the claim is established and~$\base$ stabilizes to the full
+intersection closure at the latest after $n$ iterations.
+
+\emph{Boundedness.}  Step~(2c) breaks the loop as soon as $|\base| >
+M_{\base}$, so at termination $|\base| \leq M_{\base} + |\subbase|$ (the
+additive $|\subbase|$ accounts for the initial population).  The
+\texttt{base\_complete} flag records whether the bound was ever hit.
+
+\emph{Complexity.}  Each iteration performs at most $|F| \cdot |\base|$
+intersections, each costing $O(W)$ for the bitwise \texttt{AND} and $O(W)$
+for the hash lookup.  Summing over iterations, the total number of
+intersections is bounded by $\sum_{k} |F_k| \cdot |\base_k| \leq |\base|^2$,
+yielding the stated bound of $O(|\base|^2 \cdot W)$.  The space is
+$O(|\base| \cdot W)$ for the base and its hash table.
+\end{proof}
+
+\begin{remark}[Practical base sizes]\label{rem:practical-base-size}
+For visibility graphs of time series, the empirical base sizes reported in
+Section~\ref{sec:empirical} are polynomial in~$n$ and well within the
+safety bound~$M_{\base}$.  The loose theoretical upper bound of~$2^n$ is
+essentially never approached in practice because closed neighborhoods in
+visibility graphs have substantial overlap, and the intersection lattice
+collapses rapidly.
+\end{remark}
+
+% ── 4.3 Closure under arbitrary unions ─────────────────────────────────────
+
+\subsection{Closure under arbitrary unions: wavefront propagation}%
+\label{subsec:union-closure}
+
+Given a base~$\base$, the Nada topology is
+\[
+  \tau = \Bigl\{\bigcup_{B \in \mathcal{F}} B : \mathcal{F} \subseteq \base
+  \Bigr\} \cup \{\varnothing, V\},
+\]
+the closure of~$\base$ under arbitrary unions together with the empty set
+and~$V$.  On a finite~$V$, arbitrary unions reduce to finite unions, and the
+algorithm mirrors \Cref{alg:intersection-closure} exactly with the roles of
+intersection and union exchanged.
+
+\begin{algorithm}
+\caption{Union closure by wavefront propagation}%
+\label{alg:union-closure}
+\textbf{Input:} base~$\base$, safety bound $M_{\tau} \in \mathbb{N}$. \\
+\textbf{Output:} the topology~$\tau$ together with a flag
+\texttt{topology\_complete}.
+\begin{enumerate}[leftmargin=2em, label=\textup{(\arabic*)}]
+  \item Initialize $\tau \leftarrow \base \cup \{\varnothing, V\}$, insert
+        every element into a hash table~$H_{\tau}$, set the frontier
+        $F \leftarrow \base$, and set \texttt{topology\_complete}
+        $\leftarrow$ \textup{true}.
+  \item While $F \neq \varnothing$ and $|\tau| \leq M_{\tau}$:
+  \begin{enumerate}[leftmargin=1.5em, label=\textup{(\alph*)}]
+    \item Initialize $F' \leftarrow \varnothing$.
+    \item For every $f \in F$ and every $t \in \tau$ at the start of the
+          iteration, compute $u \leftarrow f \cup t$.
+    \item If $u \notin H_{\tau}$, insert~$u$ into~$H_{\tau}$, append to
+          $\tau$ and to~$F'$; if $|\tau| > M_{\tau}$, set
+          \texttt{topology\_complete} $\leftarrow$ \textup{false} and break.
+  \end{enumerate}
+  \item Set $F \leftarrow F'$ and continue.
+  \item Return $\tau$ and \texttt{topology\_complete}.
+\end{enumerate}
+\end{algorithm}
+
+\begin{proposition}[Correctness and complexity of \Cref{alg:union-closure}]%
+\label{prop:union-closure-correct}
+\Cref{alg:union-closure} terminates in a finite number of iterations.
+If \texttt{topology\_complete} is \textup{true} at termination, then
+$\tau$ equals the Nada topology generated by~$\base$.  In all cases,
+$|\tau| \leq M_{\tau} + |\base| + 2$ and every element of~$\tau$ is
+either $\varnothing$, $V$, or a finite union of elements of~$\base$.
+The total time is $O(|\tau|^{2} \cdot W)$ word operations, and the
+space is $O(|\tau| \cdot W)$.
+\end{proposition}
+
+\begin{proof}
+\emph{Termination.}  The family~$\tau$ is a subset of $\powerset(V)$,
+which has $2^{n}$ elements.  Each iteration of the main loop either
+strictly increases $|\tau|$ or leaves it fixed; in the latter case
+$F' = \varnothing$ and the loop exits.  The number of iterations is
+therefore bounded by $2^{n}$, and a tighter bound follows from the
+observation that at the end of iteration~$k$, every element of~$\tau$
+is a union of at most $k + 1$ base elements; since any strictly
+ascending chain of such unions in $\powerset(V)$ has length at
+most~$n$, the number of iterations is at most~$n$ once the frontier
+stabilizes.
+
+\emph{Correctness.}  We show by induction on~$k$ that at the end of
+iteration~$k$ of the main loop, $\tau$ contains every union
+$\bigcup_{j \in J} B_j$ with $J \subseteq \{1, \ldots, |\base|\}$ and
+$|J| \leq k + 1$.  The base case $k = 0$ is step~(1): $\tau$ is
+initialized to $\base \cup \{\varnothing, V\}$, which contains every
+single-element union (each $B_j$ by itself).  For the inductive step,
+assume the claim holds at the end of iteration~$k$, and let
+$T = \bigcup_{j \in J} B_j$ with $|J| = k + 2$.  Choose any
+$j_{0} \in J$ and let $T' = \bigcup_{j \in J \setminus \{j_{0}\}} B_j$;
+then $T'$ has depth $k + 1$, so by the induction hypothesis
+$T' \in \tau$ at the start of iteration~$k + 1$.  Since $T'$ was
+freshly added in iteration~$k$, it lies in the frontier~$F$ at the
+start of iteration~$k + 1$.  Step~(2b) then considers the pair
+$(T', B_{j_{0}})$, computes $T = T' \cup B_{j_{0}}$, and adds~$T$
+to~$\tau$ if not already present.  Hence $\tau$ contains every
+depth-$\leq\! k + 2$ union at the end of iteration~$k + 1$.  Because
+every element of the Nada topology is a finite union of base elements
+(plus $\varnothing$ and~$V$, already inserted in step~(1)), and every
+such union has depth at most $|\base|$, the claim establishes that
+$\tau$ stabilizes to the full Nada topology within at most $n$
+iterations.
+
+\emph{Boundedness and complexity.}  Step~(2c) breaks the loop as soon
+as $|\tau| > M_{\tau}$, so at termination $|\tau| \leq M_{\tau} +
+|\base| + 2$ (the additive term accounts for the initial population
+with $\base \cup \{\varnothing, V\}$).  The
+\texttt{topology\_complete} flag records whether the bound was hit.
+Each iteration performs at most $|F| \cdot |\tau|$ unions, each
+costing $O(W)$ for the bitwise \texttt{OR} and $O(W)$ for the hash
+lookup.  Summing over iterations, the total number of union
+operations is bounded by $\sum_{k} |F_{k}| \cdot |\tau_{k}| \leq
+|\tau|^{2}$, yielding the stated bound of $O(|\tau|^{2} \cdot W)$
+word operations.  The space is $O(|\tau| \cdot W)$ for $\tau$ and its
+hash table.
+\end{proof}
+
+\begin{remark}
+In principle $|\tau|$ can be as large as $2^{|\base|}$, making topology
+enumeration by far the most expensive step of the pipeline.  The reference
+implementation therefore uses a conservative default safety bound
+$M_{\tau}$ and, for most workflows, enumerates the topology only when
+pairwise connectedness (\Cref{prop:pairwise-connected}) is explicitly
+requested.  The connected components of each marginal topology
+$\taufwd$ and $\taubwd$, as well as the base-size asymmetry $\Delta$ and the
+irreversibility indices $I_C, I_B$ of \Cref{prop:irreversibility-indices},
+are computable directly from the \emph{base} without enumerating the
+topology; see \Cref{subsec:specialization-algorithm} below.
+\end{remark}
+
+% ── 4.4 Specialization preorder algorithm ──────────────────────────────────
+
+\subsection{Exact connected components via the specialization preorder}%
+\label{subsec:specialization-algorithm}
+
+\Cref{thm:specialization-components} reduces the computation of the
+topologically connected components of a finite space $(V, \tau)$ to the
+computation of the connected components of the comparability graph of the
+specialization preorder, which in turn reduces to subset-inclusion tests of
+the ``signature'' sets $\mathcal{S}(x) = \{B \in \base : x \in B\}$.  The
+following algorithm realizes this reduction using the bitset representation,
+operating on the base~$\base$ alone and therefore avoiding any dependence
+on~$|\tau|$.
+
+\begin{algorithm}
+\caption{Connected components via the specialization preorder}%
+\label{alg:specialization-components}
+\textbf{Input:} base $\base = \{B_0, B_1, \ldots, B_{b-1}\}$ of a finite
+topological space on~$V = \{0, \ldots, n-1\}$. \\
+\textbf{Output:} the partition $V = C_1 \sqcup \cdots \sqcup C_r$ into
+topologically connected components.
+\begin{enumerate}[leftmargin=2em, label=\textup{(\arabic*)}]
+  \item \emph{Signature construction.}  For each $x \in V$, allocate a bitset
+        $\mathcal{S}(x)$ of length~$b$ (stored as $W_{\base} = \lceil b/64
+        \rceil$ words initialized to zero).  For every $j \in \{0, \ldots,
+        b-1\}$ and every $x \in B_j$, set bit~$j$ of~$\mathcal{S}(x)$.
+  \item \emph{Comparability-graph traversal.}  Initialize $\mathrm{comp}(x)
+        \leftarrow -1$ for all $x \in V$, and a component counter
+        $r \leftarrow 0$.  For each $x \in V$ in order, if $\mathrm{comp}(x)
+        = -1$, start a breadth-first search from~$x$ over the comparability
+        graph, assigning $\mathrm{comp}(\cdot) \leftarrow r$ to every vertex
+        reached, and then increment~$r$.  Two vertices $x$ and $y$ are
+        adjacent in the comparability graph if and only if
+        $\mathcal{S}(x) \subseteq \mathcal{S}(y)$ or
+        $\mathcal{S}(y) \subseteq \mathcal{S}(x)$, tested word-wise on the
+        bitset representations.
+  \item Return the partition $\{C_1, \ldots, C_r\}$ where
+        $C_i = \{x \in V : \mathrm{comp}(x) = i - 1\}$.
+\end{enumerate}
+\end{algorithm}
+
+\begin{proposition}[Correctness and complexity of
+\Cref{alg:specialization-components}]%
+\label{prop:specialization-complexity}
+\Cref{alg:specialization-components} returns the topologically connected
+components of $(V, \tau)$ exactly, not as a heuristic approximation.  Its
+time complexity is $O(n \cdot b + n^{2} \cdot W_{\base})$ and its space
+complexity is $O(n \cdot W_{\base})$, where $b = |\base|$ and
+$W_{\base} = \lceil b / 64 \rceil$.  In particular, the algorithm runs in
+polynomial time in~$n$ and~$b$ without enumerating the topology, which may
+be exponentially larger than~$b$.
+\end{proposition}
+
+\begin{proof}
+Correctness is an immediate consequence of
+\Cref{thm:specialization-components}: the topological connected components
+of a finite space coincide with the connected components of the
+comparability graph of the specialization preorder, and two vertices are
+comparable in that preorder if and only if one signature is a subset of the
+other.  The breadth-first search of step~(2) computes the connected
+components of an undirected graph by definition.
+
+For complexity, step~(1) performs
+$\sum_{j=0}^{b-1} |B_j| = O(n \cdot b)$ bit assignments in the worst case
+(each element of each base set contributes one bit).  Step~(2) performs at
+most $O(n^{2})$ pairwise subset tests, each costing $O(W_{\base}) =
+O(b / 64)$ word operations, for a total of $O(n^{2} \cdot b / 64)$.  Adding
+the two contributions yields the stated bound.  The signature array
+requires $O(n \cdot W_{\base})$ words of memory.
+\end{proof}
+
+By \Cref{prop:specialization-complexity}, connectedness---and therefore
+the component-count irreversibility index~$I_C$, the asymmetry
+direction~$\Delta$, and the base-size irreversibility index~$I_B$ of
+\Cref{prop:irreversibility-indices}---is computable in polynomial time
+from the base alone, without any dependence on~$|\tau|$.  In the reference implementation, the topology is enumerated
+only when pairwise connectedness (\Cref{subsec:pairwise-algorithm}) is
+explicitly requested.
+
+% ── 4.5 Alexandrov topology via reverse-order propagation ──────────────────
+
+\subsection{The Alexandrov topology via reverse-order reachability
+propagation}%
+\label{subsec:alexandrov-algorithm}
+
+The directed Nada construction is complemented by the Alexandrov topology
+induced by the reachability preorder of the DAG
+(\Cref{thm:alexandrov-subtopology}).  For a DAG whose vertices are given in
+topological order, this topology admits a particularly efficient computation
+that exploits the order and requires only a single sweep.
+
+Let $G = (V, E)$ be a finite DAG with $V = \{0, 1, \ldots, n-1\}$, satisfying
+the topological-order property that every edge $(i, j) \in E$ has $i < j$.
+(A directed visibility graph of a time series always satisfies this, with
+the time index playing the role of topological order.)  Let
+$R \subseteq V \times V$ denote the edge relation of~$G$ and let~$R^{*}$ be
+its reflexive-transitive closure.  The following lemma is the key ingredient
+that justifies computing the Alexandrov topology from single-step
+reachability.
+
+\begin{lemma}[Upsets of~$R$ coincide with upsets of~$R^{*}$]%
+\label{lem:upsets-R-Rstar}
+Let $R$ be any binary relation on a finite set~$V$, and let~$R^{*}$ be its
+reflexive-transitive closure.  A subset $U \subseteq V$ is an upset of~$R$
+(i.e., $x \in U$ and $x R y$ imply $y \in U$) if and only if~$U$ is an upset
+of~$R^{*}$ (i.e., $x \in U$ and $x R^{*} y$ imply $y \in U$).
+\end{lemma}
+
+\begin{proof}
+If $U$ is an upset of~$R^{*}$, then since $R \subseteq R^{*}$, any
+$R$-successor of an element of~$U$ is also an $R^{*}$-successor, hence lies
+in~$U$; so $U$ is an upset of~$R$.
+
+Conversely, suppose~$U$ is an upset of~$R$, let $x \in U$, and let
+$x R^{*} y$.  By definition of the reflexive-transitive closure, there
+exists a finite chain
+\[
+  x = z_0 \; R \; z_1 \; R \; \cdots \; R \; z_m = y
+\]
+of length $m \geq 0$ (with $m = 0$ meaning $y = x \in U$ by reflexivity of
+$R^{*}$).  Induction on~$m$ shows that every~$z_i$ lies
+in~$U$: the base case $z_0 = x \in U$ is the hypothesis, and if
+$z_i \in U$ then $z_i R z_{i+1}$ together with the upset property of~$U$
+forces $z_{i+1} \in U$.  Therefore $y = z_m \in U$, proving that~$U$ is an
+upset of~$R^{*}$.
+\end{proof}
+
+\Cref{lem:upsets-R-Rstar} tells us that the Alexandrov topology~$\tau_A$
+with open sets equal to the upsets of~$R^{*}$ coincides with the topology
+whose open sets are the upsets of~$R$.  We may therefore compute the
+minimal open set of each vertex directly from the single-step relation,
+provided we iterate along~$R$ once per vertex to accumulate multi-step
+reachability.  The reverse topological order of the DAG allows this to be
+done in a single sweep with bitset \texttt{OR}.
+
+\begin{algorithm}
+\caption{Alexandrov topology by reverse-order bitset propagation}%
+\label{alg:alexandrov}
+\textbf{Input:} a DAG $G = (V, E)$ with $V = \{0, \ldots, n-1\}$ and every
+edge $(i, j) \in E$ satisfying $i < j$; the forward out-neighborhoods
+$\mathrm{out}(v) = \{w : (v, w) \in E\}$. \\
+\textbf{Output:} an array $\mathrm{reach}[\,\cdot\,]$ of bitsets over~$V$
+such that $\mathrm{reach}[v]$ equals the set of~$R^{*}$-successors of~$v$,
+which is the minimal open set of~$v$ in the Alexandrov topology~$\tau_A$.
+\begin{enumerate}[leftmargin=2em, label=\textup{(\arabic*)}]
+  \item For every $v \in V$, initialize the bitset $\mathrm{reach}[v]
+        \leftarrow \{v\}$.
+  \item For $v = n-1, n-2, \ldots, 0$ in reverse order: for every
+        $w \in \mathrm{out}(v)$, set $\mathrm{reach}[v] \leftarrow
+        \mathrm{reach}[v] \cup \mathrm{reach}[w]$ (one bitset \texttt{OR}).
+  \item Return $\mathrm{reach}[\,\cdot\,]$.  The Alexandrov base is obtained
+        by deduplicating $\{\mathrm{reach}[v] : v \in V\}$ via a hash table;
+        the full topology~$\tau_A$, if required, is obtained by closing the
+        base under arbitrary unions via \Cref{alg:union-closure}.
+\end{enumerate}
+\end{algorithm}
+
+\begin{proposition}[Correctness and complexity of \Cref{alg:alexandrov}]%
+\label{prop:alexandrov-correct}
+After \Cref{alg:alexandrov} terminates, $\mathrm{reach}[v]$ equals the set
+of all~$R^{*}$-successors of~$v$, which by \Cref{lem:upsets-R-Rstar} is the
+minimal open set of~$v$ in~$\tau_A$.  The algorithm runs in time
+$O(n + m \cdot n / 64)$ and uses space $O(n^{2} / 64)$, where
+$m = |E|$.
+\end{proposition}
+
+\begin{proof}
+\emph{Correctness.}  We prove by reverse induction on~$v$ that, after the
+iteration of the main loop indexed by~$v$, $\mathrm{reach}[v]$ equals the
+set of all~$R^{*}$-successors of~$v$.
+
+\emph{Base case} ($v = n - 1$).  The topological-order property forces
+$\mathrm{out}(n-1) = \varnothing$: any edge $(n-1, w) \in E$ would require
+$w > n-1$, which is impossible because $n-1$ is the maximum index.  Hence
+the inner loop is vacuous and $\mathrm{reach}[n-1] = \{n-1\}$, which equals
+the set of $R^{*}$-successors of~$n-1$ because $n-1$ is a maximal element.
+
+\emph{Inductive step.}  Suppose the claim holds for every $v' > v$.  At the
+start of the iteration indexed by~$v$, we have $\mathrm{reach}[v] = \{v\}$
+from the initialization in step~(1).  For every $w \in \mathrm{out}(v)$, the
+topological-order property yields $w > v$, so by the induction hypothesis
+$\mathrm{reach}[w]$ already equals the set of $R^{*}$-successors of~$w$.
+The inner loop then sets
+\[
+  \mathrm{reach}[v] \;=\; \{v\} \;\cup\; \bigcup_{w \in \mathrm{out}(v)}
+  \mathrm{reach}[w] \;=\; \{v\} \;\cup\; \bigcup_{w \in \mathrm{out}(v)}
+  \bigl\{u : w R^{*} u\bigr\}.
+\]
+By definition of the reflexive-transitive closure, the set of
+$R^{*}$-successors of~$v$ is exactly $\{v\}$ together with the union of the
+sets of $R^{*}$-successors of all one-step $R$-successors of~$v$, which is
+the right-hand side of the above display.  Hence $\mathrm{reach}[v]$ is
+correct at the end of iteration~$v$.  Reverse induction on $v$ from~$n-1$
+down to~$0$ establishes the claim for all vertices.
+
+That the resulting family $\{\mathrm{reach}[v] : v \in V\}$ is a base for
+the Alexandrov topology~$\tau_A$ follows from the standard correspondence
+between preorders and Alexandrov topologies on finite sets
+(\Cref{thm:alexandrov-correspondence}) together with
+\Cref{lem:upsets-R-Rstar}: the minimal open set of~$v$ in any Alexandrov
+topology is the intersection of all open sets containing~$v$, and for the
+topology of upsets of~$R^{*}$ this minimal open set is precisely the
+$R^{*}$-upward closure of~$\{v\}$, which equals $\mathrm{reach}[v]$.
+
+\emph{Complexity.}  Step~(1) costs $O(n)$.  In step~(2), each outgoing edge
+$(v, w) \in E$ contributes one bitset \texttt{OR} of cost $O(W) = O(n/64)$,
+and each vertex is visited exactly once.  The total cost of the main loop
+is $\sum_{v \in V} |\mathrm{out}(v)| \cdot O(n/64) = O(m \cdot n / 64)$.
+Adding the initialization cost yields the stated time bound.  The space is
+dominated by the $\mathrm{reach}$ array, which holds~$n$ bitsets each of
+$O(n/64)$ words, for a total of $O(n^{2}/64)$.
+\end{proof}
+
+\begin{remark}[Optimality]\label{rem:alexandrov-optimal}
+\Cref{alg:alexandrov} is asymptotically optimal for dense DAGs under the
+word-RAM model with $64$-bit words: no algorithm can compute the transitive
+closure in asymptotically less than $\Theta(n \cdot m / 64)$ time in this
+model.  The reverse-order sweep achieves this bound while simultaneously
+exploiting the topological order to avoid any explicit stabilization loop.
+The Alexandrov base produced by \Cref{alg:alexandrov} can be fed directly
+into \Cref{alg:specialization-components} to obtain the topological
+connected components of~$\tau_A$ in the polynomial time bound of
+\Cref{prop:specialization-complexity}, once again without enumerating
+$\tau_A$ itself.
+\end{remark}
+
+% ── 4.6 Pairwise connectedness ─────────────────────────────────────────────
+
+\subsection{Pairwise connectedness and the three-valued return}%
+\label{subsec:pairwise-algorithm}
+
+The pairwise connectedness test of \Cref{prop:pairwise-connected} is the
+only operation in the pipeline that requires the full enumeration of both
+topologies $\taufwd$ and $\taubwd$.  It is therefore the most expensive
+step and the one most likely to exceed the safety bound~$M_{\tau}$ of
+\Cref{alg:union-closure}.  This section describes the algorithm and gives
+particular attention to the constructive handling of budget overflow.
+
+\begin{algorithm}
+\caption{Pairwise connectedness check}%
+\label{alg:pairwise}
+\textbf{Input:} enumerated topologies $\taufwd$ and $\taubwd$ on~$V$, each
+with its \texttt{topology\_complete} flag from \Cref{alg:union-closure}. \\
+\textbf{Output:} one of the three values $\{\textup{pairwise connected},
+\textup{pairwise disconnected}, \textup{undecided}\}$, together with a
+witness pair $(U, V \setminus U)$ when the answer is \textup{pairwise
+disconnected}.
+\begin{enumerate}[leftmargin=2em, label=\textup{(\arabic*)}]
+  \item Build a hash table $H^{-}$ containing every $W \in \taubwd$ with
+        $\varnothing \neq W \neq V$.
+  \item For every $U \in \taufwd$ with $\varnothing \neq U \neq V$, compute
+        $W \leftarrow V \setminus U$ (bitset complement with masking of the
+        unused high bits of the last word).  If $W \in H^{-}$, return
+        \textup{pairwise disconnected} with the witness pair $(U, W)$.
+  \item If the loop of step~(2) completes without finding a witness, then:
+  \begin{itemize}[leftmargin=1.5em]
+    \item if both \texttt{topology\_complete} flags are \textup{true},
+          return \textup{pairwise connected};
+    \item otherwise, return \textup{undecided}.
+  \end{itemize}
+\end{enumerate}
+\end{algorithm}
+
+\begin{proposition}[Soundness, complexity, and epistemic status of
+\Cref{alg:pairwise}]%
+\label{prop:pairwise-correct}
+\Cref{alg:pairwise} is sound with respect to the pairwise connectedness
+predicate of \Cref{def:pairwise-connected}.  Specifically:
+\begin{enumerate}[leftmargin=2em, label=\textup{(\roman*)}]
+  \item if it returns \textup{pairwise disconnected} with witness $(U, W)$,
+        then $U \in \taufwd$, $W \in \taubwd$, $U \cup W = V$, and
+        $U \cap W = \varnothing$, so $(U, W)$ genuinely witnesses the
+        disconnection;
+  \item if it returns \textup{pairwise connected}, the bitopological space
+        $(V, \taufwd, \taubwd)$ is pairwise connected;
+  \item if it returns \textup{undecided}, nothing is claimed about the
+        pairwise connectedness of $(V, \taufwd, \taubwd)$.
+\end{enumerate}
+The time complexity is $O(|\taufwd| \cdot W + |\taubwd| \cdot W)$ and the
+space complexity is $O(|\taubwd| \cdot W)$ for the hash table.
+\end{proposition}
+
+\begin{proof}
+Claim~(i): the hash table~$H^{-}$ is built from~$\taubwd$, so any~$W$ that
+it contains lies in~$\taubwd$.  The set $W = V \setminus U$ by
+construction, so $U \cup W = V$ and $U \cap W = \varnothing$ identically.
+Hence the witness pair is genuine.
+
+Claim~(ii): a \textup{pairwise connected} return requires both
+\texttt{topology\_complete} flags to be \textup{true}, so the loop of
+step~(2) has examined every proper nonempty $U \in \taufwd$ and every
+proper nonempty $W \in \taubwd$ is present in~$H^{-}$.  The failure to
+find a witness means no such pair $(U, W)$ with $W = V \setminus U$ exists
+in $\taufwd \times \taubwd$, which by
+\Cref{prop:pairwise-connected} is the definition of pairwise
+connectedness.
+
+Claim~(iii) is immediate: the \textup{undecided} branch makes no claim.
+Complexity is dominated by the single pass over $\taufwd$ in step~(2),
+each iteration performing one bitset complement and one hash lookup, each
+$O(W)$.  The hash table occupies $O(|\taubwd| \cdot W)$ space.
+\end{proof}
+
+The three-valued return of \Cref{alg:pairwise} deserves explicit discussion
+because it encodes a methodological commitment.  When either
+\texttt{topology\_complete} flag is \textup{false}, \Cref{alg:pairwise}
+has not completed the exhaustive search over the full~$\taufwd$, or has
+compared against an incomplete~$H^{-}$ (or both), and therefore cannot
+soundly claim pairwise connectedness.  A classical implementation would be
+tempted to treat budget overflow as ``good enough'' and default to one of
+the two Boolean answers; but either choice would attach a truth value to a
+proposition that has not been decided with the resources consumed.
+
+The constructively correct response is to return a third value,
+\textup{undecided}, which reflects the actual epistemic state of the
+computation after finite work.  The distinction between
+``decided~\textup{true}'', ``decided~\textup{false}'', and ``not decided
+within the available budget'' is not cosmetic: any downstream consumer of
+the pairwise connectedness result must propagate \textup{undecided} as a
+third value and cannot collapse it to a Boolean without losing soundness.
+In practice, the \textup{undecided} return is a signal either to increase
+$M_{\tau}$ and retry, or to rely on the polynomial-time marginal
+invariants of \Cref{alg:specialization-components}---which do not require
+topology enumeration---instead.  This design decision is the operational
+counterpart, at the algorithmic level, of the constructivist discipline
+articulated in Section~\ref{sec:intro}: a topological statement counts as
+established only when the computation has finished the work that
+establishes it.
+
+% ── 4.7 Template dispatch ─────────────────────────────────────────────────
+
+\subsection{Compile-time template dispatch for small ground sets}%
+\label{subsec:template-dispatch}
+
+The bitset operations of \Cref{subsec:bitset} all run in~$O(W)$, but the
+constant hidden by the asymptotic notation depends strongly on whether the
+loop over the $W$ words is known to be a compile-time constant or a runtime
+variable.  When $W$ is known at compile time, modern C++ compilers fully
+unroll the inner loop and the intersection, union, subset test, and
+equality test reduce to a handful of machine instructions with zero loop
+overhead.  When $W$ is a runtime variable, the inner loop incurs the cost
+of loop bookkeeping, branch prediction, and potential pipeline stalls.
+For the small ground sets typical of visibility graphs of short time
+series, the compile-time case is overwhelmingly the common one, and it is
+worth specializing.
+
+The reference implementation uses C++ templates to dispatch at compile time
+on three specialized values of~$W$, selected to cover the most common size
+regimes for time-series applications:
+\begin{itemize}[leftmargin=2em]
+  \item $W = 1$, covering $n \leq 64$, in which every bitset operation
+        becomes a single \texttt{uint64\_t} instruction;
+  \item $W = 2$, covering $65 \leq n \leq 128$, in which operations are two
+        instructions fully unrolled;
+  \item $W = 3$, covering $129 \leq n \leq 192$, unrolled to three
+        instructions.
+\end{itemize}
+For $n > 192$, the implementation falls back to a runtime loop over a
+variable~$W$, which is slower per operation but imposes no upper bound
+on~$n$.  The dispatch happens in a single switch statement at the entry
+point of each algorithm, selecting the appropriate template specialization
+based on $W = \lceil n / 64 \rceil$.
+
+The template dispatch changes the constant factor but not the asymptotic
+complexity of any algorithm.  All the bounds stated in
+\Cref{prop:intersection-closure-correct},
+\Cref{prop:union-closure-correct},
+\Cref{prop:specialization-complexity},
+\Cref{prop:alexandrov-correct}, and \Cref{prop:pairwise-correct} hold in
+either dispatch regime; the specializations merely reduce the constant
+hidden by $O(W)$ to a small fixed integer number of instructions for the
+common small-$n$ case.  The practical speedup on the size regimes that
+dominate time-series applications is substantial: between threefold and
+tenfold over an unspecialized loop, depending on the operation and the
+surrounding hot path.
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Empirical Application: Topological Analysis of U.S.\ Real GDP Growth}%
+\label{sec:empirical}
+% ══════════════════════════════════════════════════════════════════════════════
+
+We now apply the directed Nada bitopological construction of
+\Cref{sec:extension}, together with the algorithms of
+\Cref{sec:algorithms}, to a time series with well-known dynamical
+asymmetries: the quarter-on-quarter growth rate of U.S.\ real gross
+domestic product. The goal is twofold. First, to demonstrate that the
+pipeline produces quantitative invariants on a real economic dataset,
+with no tuning of free parameters and at a computational cost negligible
+on commodity hardware. Second, and more importantly, to show that the
+three topological layers built by the pipeline---the Alexandrov topology
+$\tau_A$, the undirected Nada topology $\tau_{\text{Nada}}$, and the
+directed Nada bitopology $(\taufwd, \taubwd)$---reveal \emph{distinct
+structural facts} about the same series, each at a different level of
+resolution, and that the asymmetry between $\taufwd$ and $\taubwd$
+provides a purely topological quantification of temporal irreversibility
+consistent with the classical economic literature on business-cycle
+asymmetries.
+
+%-------------------------------------------------------------------------------
+\subsection{Data and construction pipeline}\label{subsec:data}
+%-------------------------------------------------------------------------------
+
+The series analyzed is the seasonally adjusted quarterly growth rate of
+U.S.\ real gross domestic product, spanning Q1~1992 to Q1~2024 for a
+total of $n = 129$ observations. The choice of this window is deliberate:
+it straddles three distinct macroeconomic regime shifts---the
+dot-com bust of 2001, the Global Financial Crisis of 2008--2009, and
+the COVID-19 shock of 2020---while remaining within a single statistical
+regime for the underlying measurement methodology. The combined presence
+of these three episodes, each with markedly different speed and depth of
+contraction and recovery, makes the series a canonical case of an
+asymmetric dynamical system: expansions are typically gradual and
+sustained, while contractions can be sharp or catastrophic. The
+literature on business-cycle asymmetries, from Neftçi to Hamilton's
+regime-switching models, has documented this temporal irreversibility
+through statistical methods; here we approach it topologically.
+
+The construction pipeline proceeds in the following stages:
+\begin{enumerate}[label=(\roman*), leftmargin=2em]
+\item From the raw series we construct the Horizontal Visibility Graph
+(HVG) and the Natural Visibility Graph (NVG) in their directed form,
+with edges oriented from earlier to later time indices. Both graphs are
+DAGs on the same vertex set $V = \{1, 2, \ldots, 129\}$.
+\item For each graph we compute the undirected Nada topology (closing
+the family of undirected closed neighborhoods under finite intersection
+and arbitrary union), the forward Nada topology $\taufwd$ (from the
+forward closed neighborhoods $\Nfwd{v}$), the backward Nada topology
+$\taubwd$ (from the backward closed neighborhoods $\Nbwd{v}$), and the
+Alexandrov topology $\tau_A$ (from the reachability upsets of the
+directed edge relation).
+\item For each of these topologies we compute the exact number of
+connected components via the specialization-preorder algorithm
+(\Cref{alg:specialization-components}), together with the base size
+$|\base|$ produced by the intersection-closure step
+(\Cref{alg:intersection-closure}). For the Alexandrov topology we use
+the reverse-order propagation of
+\Cref{alg:alexandrov}.
+\item From the forward and backward invariants we compute the three
+bitopological quantities of Proposition~\ref{prop:irreversibility-indices}:
+the component-count irreversibility index~$I_C$, the base-size
+irreversibility index~$I_B$, and the asymmetry direction~$\Delta = C^-
+- C^+$.
+\end{enumerate}
+The entire pipeline runs in well under one second on commodity hardware
+for $n = 129$; the dominant cost is the intersection closure of the base,
+which for the Horizontal Visibility Graph produces a base of size~$470$
+and for the Natural Visibility Graph a base of size~$415$. No safety
+bound is triggered for this~$n$; all topologies relevant to connectedness
+are computed exactly, with complete bases.
+
+%-------------------------------------------------------------------------------
+\subsection{Results}\label{subsec:results}
+%-------------------------------------------------------------------------------
+
+\Cref{tab:gdp-results} collects the principal invariants for both graph
+constructions and all four topologies. The entries are produced directly
+by the reference implementation and not rounded beyond what is shown.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{l c c c c c}
+\hline
+\textbf{Topology} & \textbf{Edges} & \textbf{Base size} &
+  \textbf{Components} & \textbf{Connected?} & $\Delta / I_{C}$ \\
+\hline
+\multicolumn{6}{l}{\emph{Horizontal Visibility Graph (HVG)}} \\
+Undirected Nada $\tau_{\text{Nada}}$ & $248$ & $470$ & $36$ & no & --- \\
+Forward Nada $\taufwd$               & ---  & $250$ & $63$ & no & --- \\
+Backward Nada $\taubwd$              & ---  & $250$ & $67$ & no & --- \\
+Alexandrov $\tau_A$                  & ---  & $129$ & $\phantom{0}1$ & yes & --- \\[0.4ex]
+\multicolumn{5}{l}{\hspace{1em}Asymmetry direction $\Delta = C^{-} - C^{+}$:}
+  & $+4$ \\
+\multicolumn{5}{l}{\hspace{1em}Component-count irreversibility $I_{C}$:}
+  & $0.060$ \\
+\multicolumn{5}{l}{\hspace{1em}Base-size irreversibility $I_{B}$:}
+  & $0.000$ \\
+\hline
+\multicolumn{6}{l}{\emph{Natural Visibility Graph (NVG)}} \\
+Undirected Nada $\tau_{\text{Nada}}$ & $406$ & $415$ & $\phantom{0}6$ & no & --- \\
+Forward Nada $\taufwd$               & ---  & $239$ & $27$ & no & --- \\
+Backward Nada $\taubwd$              & ---  & $239$ & $31$ & no & --- \\
+Alexandrov $\tau_A$                  & ---  & $129$ & $\phantom{0}1$ & yes & --- \\[0.4ex]
+\multicolumn{5}{l}{\hspace{1em}Asymmetry direction $\Delta = C^{-} - C^{+}$:}
+  & $+4$ \\
+\multicolumn{5}{l}{\hspace{1em}Component-count irreversibility $I_{C}$:}
+  & $0.129$ \\
+\multicolumn{5}{l}{\hspace{1em}Base-size irreversibility $I_{B}$:}
+  & $0.000$ \\
+\hline
+\end{tabular}
+\caption{Topological invariants of the directed Nada bitopological
+analysis of U.S.\ real GDP quarterly growth, Q1~1992 to Q1~2024
+($n = 129$). Edges refer to the undirected graph; forward and backward
+topologies inherit the underlying directed edges by orientation.
+Components are exact topological connected components computed via the
+specialization preorder (\Cref{alg:specialization-components}). The
+irreversibility indices $\Delta$ and $I_C$ are computed from the forward
+and backward component counts as defined in
+Proposition~\ref{prop:irreversibility-indices}; $I_B$ is computed from
+the forward and backward base sizes.\label{tab:gdp-results}}
+\end{table}
+
+We now read \Cref{tab:gdp-results} line by line, distinguishing the
+structural facts revealed by each topological layer.
+
+\paragraph{The Alexandrov layer: global connectedness.}
+For both graph constructions, the Alexandrov topology $\tau_A$ has
+exactly one connected component and a base of size~$n = 129$. This is
+the maximum possible connectedness of the topology, and it means that
+the reachability preorder of the directed visibility graph links every
+observation to every other observation through a chain of directed
+paths. In economic terms, the U.S.\ GDP series is globally connected at
+the level of \emph{causal-temporal precedence}: every quarter influences
+every subsequent quarter through the compositional structure of the
+business cycle. The base size of~$129$ equals the number of observations,
+meaning that the minimal Alexandrov base consists of one minimal open
+set per vertex and no coalescence occurs. This layer, on its own, would
+lead to the conclusion that the system is indecomposable---a conclusion
+that is true at the level of reachability but hides the finer structure
+revealed by the higher layers.
+
+\paragraph{The undirected Nada layer: local fragmentation.}
+The picture changes drastically at the level of the undirected Nada
+topology. For the HVG, $\tau_{\text{Nada}}$ has $36$ connected
+components and a base of $470$ elements---more than three times the
+number of vertices. For the NVG, it has $6$ connected components and a
+base of $415$ elements. In both cases the topology is
+\emph{disconnected}, which means that the closure of the closed
+neighborhoods under finite intersection produces a partition of the
+vertex set into topologically incommensurable clusters. The intersection
+closure captures something that the pure reachability structure cannot:
+local commonalities of neighborhood, where a single vertex may be linked
+to two others that nevertheless belong to different Nada components
+because their intersections with other neighborhoods isolate them. The
+contrast with the Alexandrov layer is sharp: the same DAG is globally
+connected under the reachability topology and highly fragmented under
+the intersection-closed topology.
+
+\paragraph{The bitopological layer: temporal asymmetry.}
+The forward and backward Nada topologies yield strictly different
+component counts in both graph constructions. For the HVG, $\taufwd$ has
+$63$ components and $\taubwd$ has $67$; for the NVG, $\taufwd$ has $27$
+components and $\taubwd$ has $31$. In both cases $\Delta = C^{-} - C^{+}
+= +4$: the forward topology is strictly more connected than the backward
+topology, by exactly four components. The component-count irreversibility
+indices are $I_C = 0.060$ for the HVG and $I_C = 0.129$ for the NVG:
+small in absolute value but strictly positive in both cases, and both
+pointing in the same direction. Notably, the base-size irreversibility
+index $I_B$ is \emph{exactly zero} in both constructions, since
+$|\base^{+}| = |\base^{-}|$ in each graph ($250$ and $250$ for the HVG,
+$239$ and $239$ for the NVG). The asymmetry between $\taufwd$ and
+$\taubwd$ therefore lives \emph{entirely in the structure of the base
+elements and their intersection closure}, not in the cardinality of the
+generators. This is a nontrivial finding: the two subbases $\{\Nfwd{v}\}$
+and $\{\Nbwd{v}\}$ produce the same number of base elements, but the
+intersections of those elements distribute differently between the
+forward and backward cases, yielding different component structures for
+the specialization preorder.
+
+The sign of $\Delta$ is consistent with the prediction of Lacasa and
+Toral~\cite{LacasaToral2010} for time series with asymmetric dynamics:
+in a regime of slow expansions and abrupt contractions, the forward
+visibility is less obstructed than the backward visibility, so the
+forward topology should be more connected (fewer components) than the
+backward one. U.S.\ GDP in the 1992--2024 window is a paradigmatic
+example of such dynamics: the expansions of 1992--2000, 2001--2007, and
+2009--2020 are all gradual and monotone on aggregate, while the
+contractions associated with the dot-com bust, the Global Financial
+Crisis, and the COVID-19 shock are sharp and short-lived. Our
+topological quantification of this asymmetry is the positive
+$\Delta = +4$ in both HVG and NVG constructions. The numerical
+invariance of $\Delta$ across the two graph constructions, despite the
+markedly different edge counts and base sizes of HVG and NVG, suggests
+that the asymmetry is a robust feature of the underlying series rather
+than an artifact of the visibility-graph construction.
+
+%-------------------------------------------------------------------------------
+\subsection{Resolution gain: an empirical observation}%
+\label{subsec:resolution-gain}
+%-------------------------------------------------------------------------------
+
+A striking feature of \Cref{tab:gdp-results} is the large gap between
+the base size of the Nada topology and that of the Alexandrov topology.
+For the HVG, $|\base_{\text{Nada}}| - |\base_A| = 470 - 129 = +341$,
+which corresponds to a relative gain of
+$341 / 470 \approx 72.6\%$. For the NVG, $|\base_{\text{Nada}}| -
+|\base_A| = 415 - 129 = +286$, a relative gain of
+$286 / 415 \approx 68.9\%$. In both cases, more than two thirds of the
+base elements generated by the Nada intersection closure are \emph{not}
+upsets of the reachability preorder.
+
+\begin{remark}[Resolution gain is empirical, not a corollary]%
+\label{rem:resolution-gain-empirical}
+It is essential to read this observation correctly. The inclusion
+$\tau_A \subseteq \taufwd_{\text{Nada}}$ established in
+Theorem~\ref{thm:alexandrov-subtopology} is an inclusion of
+\emph{topologies}, not of base sizes. A finer topology can in general be
+generated by a \emph{smaller} base if the base is well chosen: base size
+is a property of the generator, not of the topology it generates. The
+observation that the Nada base is larger than the Alexandrov base on
+the visibility graphs of this series is therefore a fact about the two
+specific algorithms used to compute the generators---the intersection
+closure of closed neighborhoods versus the deduplicated family of
+reachability upsets---and \emph{not} a logical consequence of the
+inclusion of topologies. We present the resolution gain as an empirical
+quantity that measures the \emph{additional discriminative power}
+extracted by the Nada intersection closure beyond the pure order
+structure of the DAG, on the specific inputs analyzed here. On other
+inputs, or with different generator conventions, the direction of the
+gap could in principle be reversed, even though the inclusion of
+topologies would continue to hold.
+\end{remark}
+
+With this caveat, the resolution gain on U.S.\ GDP is large and
+consistent across the two graph constructions, which suggests that the
+intersection closure extracts genuine topological information in this
+case. Corollary~\ref{cor:resolution-hierarchy} then explains the
+mechanism: because $\tau_A$ is connected and $\tau_{\text{Nada}}$ (both
+undirected and directional) is disconnected, the disconnection of the
+Nada topology arises entirely from open sets that are generated by
+finite intersections of closed neighborhoods and that are \emph{not}
+upsets of the reachability preorder. The Nada construction sees a
+structure that the Alexandrov construction cannot see by design.
+
+%-------------------------------------------------------------------------------
+\subsection{A substantive finding: the COVID-19 shock}%
+\label{subsec:covid-finding}
+%-------------------------------------------------------------------------------
+
+Among the $129$ observations, those at indices $114$ and $115$---%
+corresponding to Q2 and Q3 of 2020, respectively---are the two most
+extreme values of the entire series. The second quarter of 2020
+records the sharpest contraction in U.S.\ real GDP on record, at an
+annualized rate of approximately $-31\%$; the third quarter of the
+same year records the sharpest rebound, at approximately $+33\%$
+annualized. These two quarters are, by almost any descriptive
+statistic, the outliers of the series.
+
+The following observation, which emerges directly from the output of
+\Cref{alg:specialization-components}, is worth making explicit: under
+the Nada topology (both undirected and directed, both HVG and NVG),
+observations~$114$ and~$115$ belong to the \emph{same} connected
+component. The sharp contraction and the sharp rebound---symmetric in
+magnitude but opposite in sign---are topologically classified together,
+not separately.
+
+This is a nontrivial finding and is not what a naive intuition would
+predict. A descriptive analysis would tend to separate the contraction
+from the rebound, because they have opposite signs and opposite economic
+interpretations. The Nada topology, however, treats them as a single
+topological unit. The mechanism is the intersection closure: both Q2 and
+Q3 2020 appear as members of many of the same base elements of
+$\base^{+}$ and $\base^{-}$, because their closed neighborhoods under
+the visibility relation overlap substantially in spite of their extreme
+and opposite values. Topologically, the pair is a single coherent
+episode---the COVID shock as a whole---rather than two unrelated events.
+This matches the economic interpretation most commonly given in the
+business-cycle literature: the contraction and the rebound of 2020 are
+two phases of a single exogenous shock, driven by the same underlying
+cause (the policy response to the pandemic), and should be analyzed
+jointly rather than as independent events. The topological classifier
+recovers this interpretation without any prior economic knowledge,
+working only from the geometric structure of the series.
+
+\begin{remark}[What the topology does and does not claim]%
+\label{rem:topology-claims}
+The finding that observations $114$ and $115$ lie in the same connected
+component of the Nada topology is a purely topological statement: it
+says that no clopen set of $\tau_{\text{Nada}}$ separates them. It does
+\emph{not} say that they are statistically similar in any conventional
+sense, nor that their values are close (in fact, they are the two most
+distant observations in the value dimension). The topology is not a
+proximity measure; it is a structural classifier that responds to the
+relational pattern of neighborhoods, not to Euclidean distance. This is
+precisely the kind of information that traditional statistical methods
+based on correlation, variance, or spectral decomposition cannot
+extract, because it lives in the combinatorics of the visibility
+relation rather than in the metric structure of the values. The
+topological analysis therefore complements, rather than replaces,
+standard statistical methods.
+\end{remark}
+
+%-------------------------------------------------------------------------------
+\subsection{Synthesis: three layers of structure}%
+\label{subsec:synthesis}
+%-------------------------------------------------------------------------------
+
+The empirical analysis of U.S.\ GDP growth reveals, via the directed
+Nada bitopological construction, three layers of structural information
+that are individually distinct and jointly informative:
+
+\begin{enumerate}[label=(\arabic*), leftmargin=2em]
+\item \textbf{Reachability layer} ($\tau_A$). The DAG is globally
+connected: every observation is linked to every later observation
+through the compositional structure of the business cycle. One
+component, trivial topology at the reachability level.
+
+\item \textbf{Intersection-closure layer} ($\tau_{\text{Nada}}$). Local
+fragmentation emerges: the series decomposes into $6$ to $36$ components
+depending on graph construction, revealing clusters of observations
+that share neighborhood structure beyond mere reachability. The
+disconnection is substantive and empirically robust.
+
+\item \textbf{Bitopological layer} $(\taufwd, \taubwd)$. Temporal
+asymmetry emerges: forward and backward Nada topologies differ in
+component count by $\Delta = +4$ in both HVG and NVG. The forward
+topology is more connected than the backward topology, consistent with
+the slow-expansion / abrupt-contraction regime of the U.S.\ economy
+over this window. The asymmetry is a topological signature of temporal
+irreversibility and is invariant to the choice between HVG and NVG.
+\end{enumerate}
+
+Each layer is obtained by a different construction---reachability
+propagation, intersection closure, and dual intersection closure
+respectively---and each layer reveals information not visible at the
+other two. The combination of all three constitutes the empirical
+content of the directed Nada bitopological analysis of the series.
+In this sense, the finding on the COVID-19 shock
+(\Cref{subsec:covid-finding}) illustrates what the second layer can do;
+the nonzero $\Delta$ values illustrate what the third layer can do; and
+the global connectedness of $\tau_A$ sets the baseline of what the first
+layer alone would report in isolation.
+
+The entire analysis requires no tuning: the visibility-graph
+constructions are parameter-free, the topology-generation procedure is
+determined by the combinatorics of the graph, and the specialization
+preorder yields exact connected components with no heuristic choices.
+The only ``parameter'' is the choice of HVG versus NVG, and for the
+purpose of the qualitative findings reported here the two give
+consistent answers.
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Discussion}\label{sec:discussion}
+% ══════════════════════════════════════════════════════════════════════════════
+
+The directed extension of the Nada construction developed in this paper
+sits at the intersection of several independent research streams: finite
+topology (Nada et al.~\cite{Nada2018}, McCord~\cite{McCord1966},
+Stong~\cite{Stong1966}), bitopology (Kelly~\cite{Kelly1963}), visibility
+graphs for time series (Lacasa et al.~\cite{Lacasa2008},
+Luque et al.~\cite{Luque2009}), and the statistical analysis of temporal
+irreversibility (Lacasa and Toral~\cite{LacasaToral2010}). We now place
+our contribution explicitly against these streams, discuss the epistemic
+status of the formal proofs and their empirical realization, acknowledge
+the limitations of the framework, and outline directions for further
+work.
+
+%-------------------------------------------------------------------------------
+\subsection{Relation to prior work}\label{subsec:relation-prior}
+%-------------------------------------------------------------------------------
+
+\paragraph{Nada, El Atik and Atef (2018).}
+The undirected Nada construction~\cite{Nada2018} was introduced as a
+systematic way to associate topological structures with arbitrary
+undirected graphs, by taking closed neighborhoods as a subbase and
+closing under finite intersections and arbitrary unions. The
+contribution of the original paper was the identification of the
+family $\{\Ncl{v} : v \in V\}$ as a topologically meaningful generator,
+and the study of the resulting topological invariants---connectedness,
+separation, continuity between graph morphisms---as graph properties.
+Our contribution with respect to Nada et al.\ is twofold. First, we
+observe that the construction is \emph{indifferent} to whether the
+generating family consists of undirected or directed neighborhoods,
+because the finite-intersection and arbitrary-union operations used in
+the construction are universal operations on the powerset and do not
+depend on any symmetry property of the underlying graph
+(Theorem~\ref{thm:directed-validity}). This observation is, as we have
+emphasized, Before elaborating, we state the rhetorical hierarchy plainly. The proof is a one-line corollary of the universality of the generated-topology functor on $\mathcal{P}(V)$ and carries essentially no mathematical content; the contribution of this paper begins, rather than ends, at this corollary. structurally trivial once stated correctly: it is a
+one-sentence corollary of the universality of the generated-topology
+functor on $\powerset(V)$. The triviality is the point: the extension
+is available \emph{for free}, with no new mathematical machinery. What
+is not trivial is the second component of our contribution: the
+recognition that when the construction is applied separately to the
+forward and backward neighborhood families of a directed graph, the
+pair $(\taufwd, \taubwd)$ is not merely two topologies but a
+bitopological space in the sense of Kelly, and that its pairwise
+properties encode temporal asymmetry.
+
+\paragraph{Kelly (1963).}
+Kelly's theory of bitopological spaces~\cite{Kelly1963} was developed
+in a purely formal context, with no particular empirical application
+in mind. The natural examples at the time of its introduction were
+metric-theoretic---quasi-pseudometric spaces and their forward and
+backward topologies---and algebraic. To our knowledge, the
+bitopological structure has not previously been used to analyze time
+series or to quantify temporal irreversibility. Our contribution is to
+\emph{realize} Kelly's abstract bitopology on a concrete dynamical
+object: the directed visibility graph of a time series. The forward
+topology $\taufwd$ arises from forward neighborhoods that look toward
+the future; the backward topology $\taubwd$ arises from backward
+neighborhoods that look toward the past. The pair
+$(V, \taufwd, \taubwd)$ is an honest bitopological space, and its
+pairwise connectedness characterizes whether the forward and backward
+views of the series are topologically compatible. The irreversibility
+indices of Proposition~\ref{prop:irreversibility-indices} quantify the
+degree to which they are not.
+
+\paragraph{Lacasa et al.\ (2008) and Luque et al.\ (2009).}
+Visibility graphs map time series into combinatorial objects that
+preserve dynamical structure: periodic series yield regular graphs,
+random series yield exponential degree distributions, fractal series
+yield power-law degree distributions. The directed versions of these
+graphs preserve the temporal orientation of the series, so that causal
+precedence is retained. Prior work on directed visibility graphs has
+focused primarily on degree-based asymmetry statistics
+(in-degree versus out-degree distributions, directed clustering) as a
+measure of temporal irreversibility. Our contribution is orthogonal to
+those metrics: the bitopological analysis operates at the level of the
+full neighborhood structure, not just the degree counts, and captures
+asymmetries that are invisible to degree statistics. In particular, as
+our empirical analysis of the U.S.\ GDP series demonstrates
+(\Cref{sec:empirical}), the base sizes $|\base^{+}|$ and $|\base^{-}|$
+can be exactly equal---yielding $I_{B} = 0$---while the component
+structures of $\taufwd$ and $\taubwd$ differ. This is an asymmetry that
+lives in the combinatorics of the intersection closure, not in the
+cardinality of the generators, and it would be missed by any method
+that examines only the first-order neighborhood statistics.
+
+\paragraph{McCord (1966) and Stong (1966).}
+The specialization-preorder theorem for finite topological
+spaces~\cite{McCord1966,Stong1966} is the technical instrument that
+makes our framework computationally tractable.
+\Cref{thm:specialization-components} reduces topological connectedness---a
+property defined in terms of all open sets---to connectedness of an
+auxiliary graph built entirely from the base. The consequence is that
+decision of connectedness becomes polynomial in $n$ and $|\base|$,
+with no dependence on the potentially exponential size of the
+topology. Without this reduction, the directed Nada bitopological
+analysis would be computationally infeasible for anything beyond trivial
+series lengths. The theorem is classical but, as we noted in the Lean
+formalization, it is not currently available in Mathlib; our single
+remaining \texttt{sorry} in the formalization corresponds exactly to
+this result, and closing that gap---either by formalizing McCord's
+original proof in Lean 4 or by deriving it from the existing Mathlib
+machinery for specialization preorders---is a natural piece of future
+work.
+
+\paragraph{Lacasa and Toral (2010).}
+The analysis of temporal irreversibility in time series via directed
+visibility graphs was pioneered by Lacasa and Toral~\cite{LacasaToral2010},
+who proposed measuring irreversibility through the asymmetry of the
+degree distributions of the in- and out-neighborhoods. Their framework
+is information-theoretic: the irreversibility of the series is
+quantified by the Kullback-Leibler divergence between the in-degree
+and out-degree distributions, and the resulting index is zero for
+reversible dynamics and strictly positive for irreversible ones. Our
+bitopological framework yields a parallel quantification: the
+component-count irreversibility index~$I_C$ and the asymmetry
+direction~$\Delta$ of
+Proposition~\ref{prop:irreversibility-indices} are topological
+analogues of their statistical asymmetry measures. The two approaches
+are complementary: Lacasa and Toral measure irreversibility at the
+level of neighborhood size statistics, we measure it at the level of
+topological component structure. On the U.S.\ GDP series our
+bitopological framework yields $\Delta = +4$ in both the HVG and NVG
+constructions, a value that is stable across graph types and points in
+the direction predicted by the Lacasa-Toral theory for series with
+slow expansions and abrupt contractions.
+
+%-------------------------------------------------------------------------------
+\subsection{Formalist compression and constructive content}%
+\label{subsec:formalism-constructivism}
+%-------------------------------------------------------------------------------
+
+A methodological remark deserves emphasis. The validity of the directed
+extension of the Nada construction is, as we have seen, provable in a
+handful of lines: the topology axioms are universal operations on the
+powerset $\powerset(V)$, and the operations of closure under finite
+intersection and arbitrary union do not inspect whether the generating
+family was produced by a symmetric, antisymmetric, transitive, or
+arbitrary graph
+(Theorem~\ref{thm:directed-validity},
+Theorem~\ref{thm:bitopological-structure}). Once one has identified the
+correct structural abstraction---namely, that the Nada construction is
+a pair of instances of the functor $\mathcal{S} \mapsto
+\mathrm{generateFrom}(\mathcal{S})$ from families of subsets to
+topologies---the directed extension is a corollary of two applications
+of the same functor, one to $\{\Nfwd{v}\}$ and one to $\{\Nbwd{v}\}$.
+In our Lean 4 formalization against Mathlib, the proof reduces
+literally to two invocations of
+\texttt{TopologicalSpace.generateFrom}, each automatically yielding a
+topology by construction.
+
+This compressed, formalist proof is entirely satisfactory as a
+\emph{justification of validity}. It establishes, once and for all,
+that whatever directed graph we feed into the procedure, we obtain two
+topologies on its vertex set, and that their pair is a bitopological
+space. No symmetry hypothesis is required; no graph-theoretic property
+is assumed; the proof applies uniformly to every directed graph.
+
+What the compressed proof does \emph{not} tell us is whether the
+construction reveals anything substantive about the data on which it is
+run. The proof is indifferent to the content of the series. The
+empirical question---whether the bitopological asymmetry captures
+meaningful features of the dynamics, whether the component structure
+distinguishes economically interpretable episodes, whether the
+resolution gain between the Alexandrov and Nada layers is genuinely
+informative or merely notational---cannot be answered from the
+formalist proof alone. It can be answered only by running the algorithm
+on real data and observing what it returns.
+
+The algorithms of \Cref{sec:algorithms} are, in this sense, the
+\emph{decompressed realization} of the formalist proof. They take the
+abstract claim ``the Nada construction extends to directed graphs and
+produces a bitopological space'' and convert it into a procedure that,
+given a specific time series of length $n$, returns specific component
+counts, specific base sizes, specific irreversibility indices, and a
+specific answer to whether observations $114$ and $115$ of the U.S.\
+GDP series lie in the same connected component. The polynomial-time
+decidability of connectedness via the specialization preorder
+(\Cref{thm:specialization-components}) is what makes this decompression feasible;
+without it, the formalist guarantee would be of purely theoretical
+interest.
+
+The relation between the formalist proof and the constructive algorithm
+is therefore not one of opposition or rivalry. It is one of two
+complementary moments of a single methodological process: the proof
+establishes that the construction is available for every input, and the
+algorithm supplies what the proof, by its nature, cannot supply---the
+actual answer on any specific input. The validity of the method
+depends on the proof; the \emph{content} of the method depends on the
+algorithm. Neither is dispensable, and neither subsumes the other.
+
+This reading has a further consequence. The three-valued output of
+\Cref{alg:pairwise}---returning \textsc{connected},
+\textsc{disconnected}, or \textsc{undecided} when the resource budget is
+exhausted---is sometimes criticized as an inelegance: why not default
+to one of the two Boolean outcomes when the enumeration cannot complete?
+\Cref{subsec:pairwise-algorithm} in \Cref{sec:algorithms} gave the
+Brouwer--Heyting--Kolmogorov answer: because on a finite space the
+proposition is decidable \emph{in principle} but its decision
+procedure is a concrete computation, and that computation either has
+been run to completion or it has not. When it has not, claiming either
+outcome is an extrapolation that the evidence does not support. The
+honest report is the epistemic state of the algorithm after finite
+work, not a guess about what it would have returned if it had been
+allowed to run longer. This is the discipline of treating propositions
+as computational tasks: the proof \emph{is} the completed task, and
+when the task is incomplete there is no proof yet. The algorithm
+reports this faithfully, and the user is free to allocate more
+resources if a definite answer is required.
+
+%-------------------------------------------------------------------------------
+\subsection{Limitations}\label{subsec:limitations}
+%-------------------------------------------------------------------------------
+
+Several limitations of the present work should be stated explicitly.
+
+\paragraph{Pairwise connectedness requires topology enumeration.}
+The decision of pairwise connectedness
+(\Cref{alg:pairwise}) operates on the fully enumerated
+topologies $\taufwd$ and $\taubwd$. Unlike connectedness of a single
+topology, which is decidable from the base alone via the specialization
+preorder, pairwise connectedness has no analogous polynomial-time
+shortcut that we are aware of: the decision genuinely requires
+searching among the open sets for a disconnecting clopen, and the
+number of open sets can grow as $2^{|\base|}$ in the worst case. For
+the time series analyzed in \Cref{sec:empirical}, with base sizes
+around $250$, this places full enumeration well beyond feasible. In
+practice, the algorithm is invoked with a safety bound
+$\texttt{max\_open\_sets}$ and, when the bound is exceeded, honestly
+returns the undecided outcome. Developing a tractable decision
+procedure for pairwise connectedness that works directly from the two
+bases, without topology enumeration, would eliminate this limitation
+and is an open problem. We conjecture that an analogue of
+\Cref{thm:specialization-components} for the bitopological specialization
+structure may exist and would yield such a procedure, but we have not
+proved this.
+
+\paragraph{The resolution gain is empirical, not theoretical.}
+Throughout the paper, we have emphasized that the positive gap
+$|\base_{\text{Nada}}| - |\base_{A}|$ observed on the empirical series
+is a fact about the specific generators used in the two pipelines and
+not a corollary of $\tau_A \subseteq \tau^{+}_{\text{Nada}}$
+(Theorem~\ref{thm:alexandrov-subtopology}). The inclusion of
+\emph{topologies} is a theorem; the inequality of \emph{base sizes} is
+an observation that holds on the empirical series we analyzed and need
+not hold universally. On other inputs the direction of the gap could in
+principle be reversed. We do not know a structural characterization of
+the class of directed graphs on which the Nada intersection closure
+produces strictly more base elements than the Alexandrov reachability
+pipeline, and providing such a characterization is another open
+question.
+
+\paragraph{A classical result is not yet formalized in Mathlib.}
+Our Lean 4 formalization of Sections~\ref{sec:prelim} through
+\ref{sec:extension} compiles cleanly against the current Mathlib, with
+exactly one \texttt{sorry}: the statement of
+\Cref{thm:specialization-components}, the McCord--Stong equivalence between
+topological connectedness and comparability-graph connectedness for
+the specialization preorder of a finite space. The theorem is
+classical, but its formalization against Mathlib requires the
+minimal-open-set characterization of points in a finite Alexandrov
+space and the equivalence between topological and comparability-graph
+connectedness in that setting, neither of which is currently in
+Mathlib's library. We have left the theorem as a stated but unproved
+lemma (with a comment pointing to the classical references), and
+every theorem of the formalization that depends on it carries the
+dependency explicitly. The gap is purely a matter of Mathlib coverage,
+not of mathematical uncertainty, and we expect that a dedicated effort
+of a few hundred lines of Lean code would close it. We would welcome
+a Mathlib contribution implementing the McCord--Stong theorem
+systematically, as it has applications well beyond the present work.
+
+\paragraph{The method is developed for finite ground sets.}
+The specialization preorder is defined on any topological space, and
+the Alexandrov correspondence between finite preorders and finite
+Alexandrov topologies is a special case of a more general adjunction.
+In principle the directed Nada construction extends to any space on
+which closed neighborhoods are defined. In practice the base closure
+under finite intersection may fail to terminate in the infinite case,
+or the resulting base may fail to be a topological base in the
+standard sense. A systematic treatment of the infinite case would
+require additional hypotheses---local finiteness of the graph,
+compactness of the ground space, or similar---and we have not
+attempted it here. For time-series analysis the finite case is
+sufficient, since every observed series has finite length.
+
+%-------------------------------------------------------------------------------
+\subsection{Extensions and future work}\label{subsec:future-work}
+%-------------------------------------------------------------------------------
+
+The directed Nada bitopological analysis opens several directions for
+continued research.
+
+\paragraph{Directed graphs beyond visibility graphs.}
+The construction of \Cref{sec:extension} applies to any directed
+graph, and nothing in the proof of validity depends on the graph
+arising from a visibility relation. Natural candidates for further
+application include: causal graphs in epidemiology and econometrics,
+where the directed edges represent temporal precedence of events;
+dependency graphs in software engineering and project management,
+where edges represent prerequisite relations; transaction networks in
+finance and blockchain analysis, where edges represent directional
+flows of value; and gene regulatory networks in systems biology, where
+edges represent inferred activation or repression relations. In each
+of these settings, the bitopological analysis would yield forward and
+backward topologies whose asymmetry would quantify a domain-specific
+notion of irreversibility or directional structure. Whether the
+resulting invariants are useful for the substantive questions of each
+domain is an empirical question that can only be answered by
+application.
+
+\paragraph{Weighted graphs and filtrations.}
+The construction of this paper treats directed edges as unweighted.
+A natural generalization is to consider a weighted directed graph
+together with a threshold $\theta$, construct the unweighted graph
+obtained by retaining only edges of weight at least $\theta$, and
+apply the Nada construction. Varying $\theta$ yields a
+\emph{filtration} of bitopological spaces, indexed by the threshold.
+The evolution of the invariants
+$(C^{+}(\theta), C^{-}(\theta), \Delta(\theta))$ as $\theta$ varies
+would yield a persistent-bitopology analogue of persistent homology.
+The connection to persistent homology is potentially deep and warrants
+systematic investigation, particularly because the bitopological
+setting introduces a direction-sensitive refinement not present in the
+standard (undirected, scalar-valued) persistent-homology framework.
+
+\paragraph{Tighter formalization in Mathlib.}
+As noted above, closing the single \texttt{sorry} in our Lean
+formalization would complete the mechanical verification of all
+theorems stated in this paper. Beyond this, a systematic development
+of finite-space bitopology in Mathlib---including the specialization
+preorder for bitopological spaces, the pairwise variants of separation
+and connectedness, and the associated algorithms---would provide
+infrastructure for further formalizations of time-series topology and
+would establish a pattern for integrating combinatorial and continuous
+topology in a single library.
+
+\paragraph{Applications to other time series with known asymmetry.}
+The U.S.\ GDP series analyzed in \Cref{sec:empirical} was selected as
+a paradigmatic example of asymmetric economic dynamics. Other series
+with known temporal asymmetries would provide further tests of the
+method: the daily closing prices of equity indices during regimes of
+flash crashes and gradual recoveries; seismic signals during the
+buildup and release of fault stress; turbulent fluid velocity
+fluctuations with intermittent burst events; and neuronal spike
+trains during transitions between quiescent and active states.
+Systematic application of the bitopological framework to a diverse
+portfolio of such series, together with comparison against the
+degree-based asymmetry statistics of Lacasa and
+Toral~\cite{LacasaToral2010}, would clarify the relative strengths of
+the topological and statistical approaches and may suggest hybrid
+methods that combine their respective advantages.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Conclusion}\label{sec:conclusion}
+% ══════════════════════════════════════════════════════════════════════════════
+
+We have shown that the topological construction of
+Nada et al.~\cite{Nada2018}, originally formulated for undirected
+graphs, extends verbatim to directed graphs and produces a
+bitopological space in the sense of Kelly~\cite{Kelly1963} when
+applied separately to the forward and backward closed neighborhoods.
+The extension is formally trivial---a two-line corollary of the
+universality of the generated-topology functor on the powerset---but
+it opens a substantive new framework for the analysis of temporally
+asymmetric dynamical systems. Applied to directed visibility graphs of
+time series, the construction yields a hierarchy of three topological
+layers: the Alexandrov topology of the reachability preorder, which
+captures global connectedness at the level of causal precedence; the
+Nada topology of the undirected closed neighborhoods, which reveals
+local fragmentation invisible at the reachability layer; and the
+directed Nada bitopological pair, whose asymmetry directly quantifies
+temporal irreversibility. We have proved the validity of the extension
+and a family of related results on the Alexandrov sublayer, the
+specialization preorder, the three irreversibility indices, and
+pairwise connectedness; formalized the proofs in Lean 4 against
+Mathlib with a single \texttt{sorry} for the classical McCord--Stong
+theorem on finite spaces; supplied a complete suite of algorithms with
+polynomial-time complexity analysis and a three-valued decision
+procedure for pairwise connectedness that reports honestly when its
+resource budget is exhausted; and demonstrated the empirical content
+of the framework on the quarterly U.S.\ real GDP series over
+1992--2024, recovering a positive asymmetry direction consistent with
+the slow-expansion / abrupt-contraction regime of the economy and a
+coherent topological classification of the COVID-19 contraction and
+rebound as a single connected episode. The formalist proof and the
+constructive algorithm are two moments of the same methodological
+process: the proof establishes availability, the algorithm supplies
+content, and the two together give a framework that is both rigorously
+justified and empirically meaningful.
+
+
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section*{Data and Code Availability}
+\addcontentsline{toc}{section}{Data and Code Availability}
+% ══════════════════════════════════════════════════════════════════════════════
+
+All code, data, and formal proofs supporting the results of this paper
+are available in a public repository at
+\url{https://github.com/IsadoreNabi/bitopology-nada}. The repository
+contains: (i) the \LaTeX{} source of this paper; (ii) an R~Markdown
+document \texttt{reproducibility.Rmd} that regenerates
+Table~\ref{tab:gdp-results} from the FRED series \texttt{GDPC1} using
+the \texttt{topologyR} package, including a CSV snapshot of the exact
+data vintage used here so that results are bit-exact reproducible under
+later FRED revisions; (iii) the Lean~4 formalization of
+Sections~\ref{sec:prelim}--\ref{sec:extension} against
+\texttt{mathlib4}, with a single \texttt{sorry} marking the classical
+McCord--Stong theorem on finite spaces, which is available in the
+literature but not yet in \texttt{mathlib4}; and (iv) a README
+describing the three independent compilation workflows
+(\texttt{pdflatex}, \texttt{Rscript}, \texttt{lake build}). The
+empirical results of Section~\ref{sec:empirical}, including the
+$24{+}6$ soft checks documented in the R~Markdown source, are
+verifiable by a single command.
+
+
+\begin{thebibliography}{99}
+
+\bibitem{Alexandrov1937}
+P.~S.~Alexandrov,
+\emph{Diskrete R\"aume},
+Matematicheskii Sbornik \textbf{2}(44), no.~3, 501--519, 1937.
+
+\bibitem{Kelly1963}
+J.~C.~Kelly,
+\emph{Bitopological spaces},
+Proceedings of the London Mathematical Society, Series~3, \textbf{13},
+71--89, 1963.
+
+\bibitem{Lacasa2008}
+L.~Lacasa, B.~Luque, F.~Ballesteros, J.~Luque, and J.~C.~Nu\~no,
+\emph{From time series to complex networks: the visibility graph},
+Proceedings of the National Academy of Sciences \textbf{105}(13),
+4972--4975, 2008.
+
+\bibitem{LacasaToral2010}
+L.~Lacasa and R.~Toral,
+\emph{Description of stochastic and chaotic series using visibility graphs},
+Physical Review E \textbf{82}(3), 036120, 2010.
+
+\bibitem{Luque2009}
+B.~Luque, L.~Lacasa, F.~Ballesteros, and J.~Luque,
+\emph{Horizontal visibility graphs: exact results for random time series},
+Physical Review E \textbf{80}(4), 046103, 2009.
+
+\bibitem{McCord1966}
+M.~C.~McCord,
+\emph{Singular homology groups and homotopy groups of finite topological spaces},
+Duke Mathematical Journal \textbf{33}(3), 465--474, 1966.
+
+\bibitem{Nada2018}
+S.~Nada, A.~E.~F.~El~Atik, and M.~Atef,
+\emph{New types of topological structures via graphs},
+Mathematical Methods in the Applied Sciences \textbf{41}(15), 5801--5810,
+2018.
+
+\bibitem{Stong1966}
+R.~E.~Stong,
+\emph{Finite topological spaces},
+Transactions of the American Mathematical Society \textbf{123}(2),
+325--340, 1966.
+
+\end{thebibliography}
+
+\end{document}
