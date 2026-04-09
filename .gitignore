@@ -50,3 +50,14 @@ paper/*.tex.bak*
 # Rendered outputs del Rmd que no van al repo
 paper/reproducibility.docx
 paper/reproducibility.pdf
+*.bak_*
+*.bak
+
+# Python helper scripts (apply_*.py en cualquier directorio)
+apply_*.py
+
+# Backups de cualquier extensión, en cualquier directorio
+*.bak
+*.bak[0-9]
+*.bak.*
+*.bak_*
