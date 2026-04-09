@@ -2268,9 +2268,13 @@ directed Nada bitopological pair, whose asymmetry directly quantifies
 temporal irreversibility. We have proved the validity of the extension
 and a family of related results on the Alexandrov sublayer, the
 specialization preorder, the three irreversibility indices, and
-pairwise connectedness; formalized the proofs in Lean 4 against
-Mathlib with a single \texttt{sorry} for the classical McCord--Stong
-theorem on finite spaces; supplied a complete suite of algorithms with
+pairwise connectedness; formalized the proofs in Lean~4 against
+\texttt{mathlib4}~\cite{mathlib} with zero \texttt{sorry}s, depending
+on exactly one explicitly declared axiom corresponding to the
+finite-space form of the classical McCord--Stong
+theorem~\cite{McCord1966,Stong1966} (not yet available in
+\texttt{mathlib4}, and explicitly discoverable via
+\texttt{\#print axioms}); supplied a complete suite of algorithms with
 polynomial-time complexity analysis and a three-valued decision
 procedure for pairwise connectedness that reports honestly when its
 resource budget is exhausted; and demonstrated the empirical content
@@ -2292,19 +2296,29 @@ justified and empirically meaningful.
 % ══════════════════════════════════════════════════════════════════════════════
 
 All code, data, and formal proofs supporting the results of this paper
-are available in a public repository at
-\url{https://github.com/IsadoreNabi/bitopology-nada}. The repository
-contains: (i) the \LaTeX{} source of this paper; (ii) an R~Markdown
-document \texttt{reproducibility.Rmd} that regenerates
-Table~\ref{tab:gdp-results} from the FRED series \texttt{GDPC1} using
-the \texttt{topologyR} package, including a CSV snapshot of the exact
-data vintage used here so that results are bit-exact reproducible under
-later FRED revisions; (iii) the Lean~4 formalization of
+are archived at the public repository
+\url{https://github.com/IsadoreNabi/bitopology-nada} and permanently
+deposited on Zenodo~\cite{bitopology-nada-zenodo} under the concept DOI
+\href{https://doi.org/10.5281/zenodo.19488414}{\texttt{10.5281/zenodo.19488414}},
+which resolves to the latest version; the specific version used in
+this paper is v1.0.0
+(\href{https://doi.org/10.5281/zenodo.19488415}{\texttt{10.5281/zenodo.19488415}}).
+The repository contains: (i) the \LaTeX{} source of this paper; (ii) an
+R~Markdown document \texttt{reproducibility.Rmd} that regenerates
+Table~\ref{tab:gdp-results} from the FRED series \texttt{GDPC1}~\cite{FRED-GDPC1}
+using the \texttt{topologyR} package~\cite{topologyR}, together with a
+frozen CSV snapshot of the exact data vintage used here so that
+results are bit-exact reproducible under later BEA revisions;
+(iii) the Lean~4 formalization of
 Sections~\ref{sec:prelim}--\ref{sec:extension} against
-\texttt{mathlib4}, with a single \texttt{sorry} marking the classical
-McCord--Stong theorem on finite spaces, which is available in the
-literature but not yet in \texttt{mathlib4}; and (iv) a README
-describing the three independent compilation workflows
+\texttt{mathlib4}~\cite{mathlib}, which contains zero \texttt{sorry}
+and depends on exactly one user-declared axiom
+(\texttt{specialization\_chain\_of\_sameComponent}) corresponding to the
+finite-space form of the McCord--Stong
+theorem~\cite{McCord1966,Stong1966}, classical but not yet available in
+\texttt{mathlib4}; this dependency is explicitly discoverable via
+Lean's \texttt{\#print axioms} command on any downstream theorem; and
+(iv) a README describing the three independent compilation workflows
 (\texttt{pdflatex}, \texttt{Rscript}, \texttt{lake build}). The
 empirical results of Section~\ref{sec:empirical}, including the
 $24{+}6$ soft checks documented in the R~Markdown source, are
@@ -2356,6 +2370,31 @@ R.~E.~Stong,
 \emph{Finite topological spaces},
 Transactions of the American Mathematical Society \textbf{123}(2),
 325--340, 1966.
+
+\bibitem{topologyR}
+J.~M.~Gomez Julian,
+\emph{\texttt{topologyR}: Topology Generation from Graphs in R},
+R package, 2026.
+\url{https://github.com/IsadoreNabi/topologyR}.
+
+\bibitem{mathlib}
+The mathlib Community,
+\emph{The Lean Mathematical Library},
+in Proceedings of the 9th ACM SIGPLAN International Conference on
+Certified Programs and Proofs (CPP 2020), 367--381, 2020.
+\url{https://doi.org/10.1145/3372885.3373824}.
+
+\bibitem{FRED-GDPC1}
+U.S.~Bureau of Economic Analysis,
+\emph{Real Gross Domestic Product} [GDPC1],
+retrieved from FRED, Federal Reserve Bank of St.~Louis,
+\url{https://fred.stlouisfed.org/series/GDPC1}, accessed April 2026.
+
+\bibitem{bitopology-nada-zenodo}
+J.~M.~Gomez Julian,
+\emph{Bitopological Spaces from Directed Graphs: Reproducibility and
+Formalization Bundle}, version 1.0.0, Zenodo, 2026.
+\url{https://doi.org/10.5281/zenodo.19488414}.
 
 \end{thebibliography}
 
