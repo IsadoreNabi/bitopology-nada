@@ -2269,9 +2269,9 @@ temporal irreversibility. We have proved the validity of the extension
 and a family of related results on the Alexandrov sublayer, the
 specialization preorder, the three irreversibility indices, and
 pairwise connectedness; formalized the proofs in Lean~4 against
-\texttt{mathlib4}~\cite{mathlib} with zero \texttt{sorry}s, depending
-on exactly one explicitly declared axiom corresponding to the
-finite-space form of the classical McCord--Stong
+\texttt{mathlib4}~\cite{mathlib} without any \texttt{sorry}
+placeholders, relying on exactly one explicitly declared axiom
+corresponding to the finite-space form of the classical McCord--Stong
 theorem~\cite{McCord1966,Stong1966} (not yet available in
 \texttt{mathlib4}, and explicitly discoverable via
 \texttt{\#print axioms}); supplied a complete suite of algorithms with
@@ -2311,8 +2311,8 @@ frozen CSV snapshot of the exact data vintage used here so that
 results are bit-exact reproducible under later BEA revisions;
 (iii) the Lean~4 formalization of
 Sections~\ref{sec:prelim}--\ref{sec:extension} against
-\texttt{mathlib4}~\cite{mathlib}, which contains zero \texttt{sorry}
-and depends on exactly one user-declared axiom
+\texttt{mathlib4}~\cite{mathlib}, which contains no \texttt{sorry}
+placeholders and relies on exactly one explicitly declared axiom
 (\texttt{specialization\_chain\_of\_sameComponent}) corresponding to the
 finite-space form of the McCord--Stong
 theorem~\cite{McCord1966,Stong1966}, classical but not yet available in
